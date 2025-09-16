@@ -142,6 +142,16 @@ class ClaudeCodeProvider(BaseProvider):
     def _execute_claude_code(self, prompt: str) -> str
 ```
 
+**CLI Security Requirements:**
+CLI execution methods (`_execute_gemini_cli` and `_execute_claude_code`) must implement robust security controls:
+- Use subprocess with `shell=False` and argument lists (never string concatenation)
+- Enforce fixed command prefix with allowlist of permitted binaries/flags
+- Validate and sanitize user tokens through strict whitelisting
+- Use explicit minimal environment (avoid inheriting full environment)
+- Set mandatory hard timeouts for all CLI executions
+- Limit captured stdout/stderr size with truncation if exceeded
+- Log only safe metadata (never raw CLI output containing user inputs)
+
 ### 7. Message Formatter (`message_formatter.py`)
 
 **Responsibilities:**

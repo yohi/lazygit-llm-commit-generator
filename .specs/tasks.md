@@ -50,16 +50,44 @@
 
 - [ ] 8. Implement Gemini CLI provider
   - Create GeminiCLIProvider class with subprocess execution
-  - Add CLI command construction and execution logic
-  - Implement output parsing and error detection from CLI
-  - Add CLI availability checking and installation guidance
+  - **CLI Requirements:**
+    - Binary: `gcloud` from Google Cloud SDK (cloud.google.com)
+    - Supported OS: Linux/macOS/Windows, versions 420.0.0+
+    - Verification: SHA256 checksums, Apache 2.0 license
+    - Installation: Official installer or package managers (apt/brew/choco)
+  - **Security Implementation:**
+    - Use `subprocess.run()` with `shell=False` and argument lists only
+    - Parse external strings with `shlex.split()` before argument construction
+    - Mandatory input validation/sanitization for all user-provided data
+    - Resource limits: 30s timeout, 1MB stdout/stderr buffer with truncation
+    - PATH search policy: Prefer explicit binary paths over PATH resolution
+  - **Error Handling:**
+    - Map exit codes to user-friendly messages with retry/installation guidance
+    - Log only safe metadata (command name, exit code) - exclude raw output
+    - Handle CLI absence, permission errors, timeouts, oversized output
+  - **Testing Requirements:**
+    - Automated tests for normal/error scenarios including binary unavailability
   - _Requirements: 7.1, 7.3, 6.1, 6.4_
 
 - [ ] 9. Implement Claude Code CLI provider
   - Create ClaudeCodeProvider class with CLI integration
-  - Add command-line argument formatting for Claude Code
-  - Implement response parsing from CLI output
-  - Add error handling for CLI command failures
+  - **CLI Requirements:**
+    - Binary: `claude-code` from Anthropic Claude Code (claude.ai/code)
+    - Supported OS: Linux/macOS/Windows, versions 1.0.0+
+    - Verification: Official installer signatures, proprietary license
+    - Installation: Official installer from Anthropic website
+  - **Security Implementation:**
+    - Use `subprocess.run()` with `shell=False` and argument lists only
+    - Parse external strings with `shlex.split()` before argument construction
+    - Mandatory input validation/sanitization for all user-provided data
+    - Resource limits: 45s timeout, 2MB stdout/stderr buffer with streaming rotation
+    - PATH search policy: Require explicit binary path verification
+  - **Error Handling:**
+    - Map exit codes to user-friendly messages with authentication/installation guidance
+    - Log only safe metadata (command name, exit code) - exclude raw output/prompts
+    - Handle CLI absence, auth failures, rate limits, timeouts, oversized output
+  - **Testing Requirements:**
+    - Automated tests for auth/error scenarios including missing binary/credentials
   - _Requirements: 7.1, 7.3, 6.1, 6.4_
 
 - [ ] 10. Create message formatting and output handling
