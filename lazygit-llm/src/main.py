@@ -31,6 +31,7 @@ from src.config_manager import ConfigManager
 from src.git_processor import GitDiffProcessor
 from src.provider_factory import ProviderFactory
 from src.message_formatter import MessageFormatter
+from src.error_handler import ErrorHandler
 from src.base_provider import ProviderError, AuthenticationError, TimeoutError
 
 
@@ -139,6 +140,9 @@ def main() -> int:
     setup_logging(args.verbose)
     logger = logging.getLogger(__name__)
 
+    # エラーハンドラーを初期化
+    error_handler = ErrorHandler(verbose=args.verbose)
+
     try:
         # 設定を読み込み
         config_manager = ConfigManager()
@@ -180,25 +184,11 @@ def main() -> int:
         logger.info("コミットメッセージ生成完了")
         return 0
 
-    except AuthenticationError as e:
-        logger.error(f"認証エラー: {e}")
-        print(f"❌ 認証エラー: APIキーを確認してください")
-        return 1
-
-    except TimeoutError as e:
-        logger.error(f"タイムアウトエラー: {e}")
-        print(f"❌ タイムアウト: ネットワーク接続を確認してください")
-        return 1
-
-    except ProviderError as e:
-        logger.error(f"プロバイダーエラー: {e}")
-        print(f"❌ プロバイダーエラー: {e}")
-        return 1
-
     except Exception as e:
-        logger.error(f"予期しないエラー: {e}")
-        print(f"❌ エラー: {e}")
-        return 1
+        # 統一的なエラーハンドリング
+        error_info = error_handler.handle_error(e, context="main")
+        error_handler.display_error(error_info)
+        return error_info.exit_code
 
 
 if __name__ == "__main__":
