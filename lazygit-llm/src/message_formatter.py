@@ -6,7 +6,9 @@ LLMからの生のレスポンスをクリーンアップし、LazyGitとの統�
 
 import re
 import logging
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
+from functools import lru_cache
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -19,14 +21,22 @@ class MessageFormatter:
     LazyGitで表示するのに適した形式に整形する。
     """
 
-    def __init__(self, max_message_length: int = 500):
+    def __init__(self, max_message_length: int = 500, enable_caching: bool = True):
         """
         メッセージフォーマッターを初期化
 
         Args:
             max_message_length: メッセージの最大長（文字数）
+            enable_caching: キャッシュを有効にするかどうか
         """
         self.max_message_length = max_message_length
+        self.enable_caching = enable_caching
+        self._cache_lock = threading.Lock()
+        self._processing_stats = {
+            'total_processed': 0,
+            'cache_hits': 0,
+            'cache_misses': 0
+        }
 
     def format_response(self, raw_response: str) -> str:
         """
@@ -297,3 +307,181 @@ class MessageFormatter:
 
         # 適切な行が見つからない場合は最初の行を返す
         return lines[0] if lines else "Update files"
+
+    @lru_cache(maxsize=256)
+    def _cached_clean_message(self, message_hash: str, message: str) -> str:
+        """
+        LRUキャッシュを使用したメッセージクリーニング
+
+        Args:
+            message_hash: メッセージのハッシュ値（キャッシュキーとして使用）
+            message: クリーニング対象のメッセージ
+
+        Returns:
+            クリーニング済みメッセージ
+        """
+        with self._cache_lock:
+            self._processing_stats['total_processed'] += 1
+
+        return self._clean_message_internal(message)
+
+    def _clean_message_internal(self, message: str) -> str:
+        """
+        内部的なメッセージクリーニング処理
+
+        Args:
+            message: クリーニング対象のメッセージ
+
+        Returns:
+            クリーニング済みメッセージ
+        """
+        # 基本的なクリーニング
+        cleaned = self.clean_llm_response(message)
+
+        # LLMアーティファクトの除去
+        cleaned = self._remove_llm_artifacts(cleaned)
+
+        # サイズ制限の適用
+        if len(cleaned) > self.max_message_length:
+            cleaned = self._truncate_message(cleaned)
+
+        return cleaned
+
+    def optimize_for_performance(self, raw_response: str) -> str:
+        """
+        パフォーマンス最適化されたメッセージフォーマット
+
+        Args:
+            raw_response: LLMからの生レスポンス
+
+        Returns:
+            最適化処理されたメッセージ
+        """
+        if not raw_response:
+            raise ValueError("空のレスポンスです")
+
+        # メッセージサイズに応じて処理方法を選択
+        message_size = len(raw_response)
+
+        # 小さなメッセージは単純処理
+        if message_size < 100:
+            return self._clean_message_internal(raw_response)
+
+        # 中程度のメッセージはキャッシュを使用
+        if message_size < 2000 and self.enable_caching:
+            import hashlib
+            message_hash = hashlib.md5(raw_response.encode('utf-8')).hexdigest()
+            with self._cache_lock:
+                self._processing_stats['cache_hits'] += 1
+            return self._cached_clean_message(message_hash, raw_response)
+
+        # 大きなメッセージは段階的処理
+        with self._cache_lock:
+            self._processing_stats['cache_misses'] += 1
+
+        # 段階的クリーニング
+        # 1. 基本的なクリーニング
+        cleaned = self.clean_llm_response(raw_response)
+
+        # 2. 早期切り詰め（必要な場合）
+        if len(cleaned) > self.max_message_length * 2:
+            cleaned = cleaned[:self.max_message_length * 2]
+
+        # 3. LLMアーティファクトの除去
+        cleaned = self._remove_llm_artifacts(cleaned)
+
+        # 4. 最終的なサイズ調整
+        if len(cleaned) > self.max_message_length:
+            cleaned = self._truncate_message(cleaned)
+
+        return cleaned
+
+    def get_processing_stats(self) -> Dict[str, Any]:
+        """
+        処理統計情報を取得
+
+        Returns:
+            処理統計情報
+        """
+        with self._cache_lock:
+            stats = self._processing_stats.copy()
+
+        if self.enable_caching:
+            cache_info = self._cached_clean_message.cache_info()
+            stats.update({
+                'cache_hits': cache_info.hits,
+                'cache_misses': cache_info.misses,
+                'cache_size': cache_info.currsize,
+                'cache_maxsize': cache_info.maxsize
+            })
+
+        return stats
+
+    def clear_cache(self):
+        """
+        キャッシュをクリア
+        """
+        if self.enable_caching:
+            self._cached_clean_message.cache_clear()
+
+        with self._cache_lock:
+            self._processing_stats = {
+                'total_processed': 0,
+                'cache_hits': 0,
+                'cache_misses': 0
+            }
+
+        logger.debug("メッセージフォーマッターのキャッシュをクリアしました")
+
+    def bulk_format_messages(self, messages: List[str]) -> List[str]:
+        """
+        複数メッセージの一括フォーマット（最適化版）
+
+        Args:
+            messages: フォーマット対象のメッセージリスト
+
+        Returns:
+            フォーマット済みメッセージリスト
+        """
+        if not messages:
+            return []
+
+        formatted_messages = []
+
+        # 小さなバッチはシーケンシャル処理
+        if len(messages) < 10:
+            for message in messages:
+                formatted_messages.append(self.optimize_for_performance(message))
+            return formatted_messages
+
+        # 大きなバッチは効率的な処理
+        for message in messages:
+            try:
+                formatted = self.optimize_for_performance(message)
+                formatted_messages.append(formatted)
+            except Exception as e:
+                logger.warning(f"メッセージフォーマットエラー: {e}")
+                formatted_messages.append("Update files")  # フォールバック
+
+        return formatted_messages
+
+    def optimize_memory_usage(self):
+        """
+        メモリ使用量を最適化
+        """
+        # キャッシュサイズを調整
+        if self.enable_caching:
+            cache_info = self._cached_clean_message.cache_info()
+            if cache_info.currsize > cache_info.maxsize * 0.8:
+                # キャッシュが80%以上埋まっている場合は部分的にクリア
+                self._cached_clean_message.cache_clear()
+                logger.debug("メモリ最適化のためキャッシュを部分的にクリアしました")
+
+        # 統計情報のリセット
+        with self._cache_lock:
+            if self._processing_stats['total_processed'] > 10000:
+                self._processing_stats = {
+                    'total_processed': 0,
+                    'cache_hits': 0,
+                    'cache_misses': 0
+                }
