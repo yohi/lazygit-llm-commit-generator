@@ -12,11 +12,11 @@ model_name: "gpt-4"
 api_key: "${OPENAI_API_KEY}"
 
 # プロンプトテンプレート
-# {diff} は実際のgit diffに置換されます
+# $diff は実際のgit diffに置換されます
 prompt_template: |
   Based on the following git diff, generate a concise commit message that follows conventional commits format:
 
-  {diff}
+  $diff
 
   Generate only the commit message, no additional text.
 
@@ -44,6 +44,6 @@ additional_params:
 # prompt_template: |
 #   以下のgit diffに基づいて、簡潔で分かりやすいコミットメッセージを日本語で生成してください：
 #
-#   {diff}
+#   $diff
 #
 #   コミットメッセージのみを出力してください。

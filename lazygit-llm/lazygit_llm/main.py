@@ -6,12 +6,12 @@ LazyGitのカスタムコマンドから呼び出される主要スクリプト�
 標準入力からGit差分を受け取り、LLMを使用してコミットメッセージを生成する。
 
 使用方法:
-    git diff --staged | python main.py
+    lazygit-llm-generate
 
 LazyGit設定例:
     customCommands:
       - key: '<c-g>'
-        command: 'git diff --staged | python3 /path/to/main.py'
+        command: 'lazygit-llm-generate'
         context: 'files'
         description: 'Generate commit message with LLM'
         stream: true
@@ -24,15 +24,11 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
-# プロジェクトルートをPATHに追加
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-
-from src.config_manager import ConfigManager
-from src.git_processor import GitDiffProcessor
-from src.provider_factory import ProviderFactory
-from src.message_formatter import MessageFormatter
-from src.base_provider import ProviderError, AuthenticationError, ProviderTimeoutError
+from lazygit_llm.config_manager import ConfigManager
+from lazygit_llm.git_processor import GitDiffProcessor
+from lazygit_llm.provider_factory import ProviderFactory
+from lazygit_llm.message_formatter import MessageFormatter
+from lazygit_llm.base_provider import ProviderError, AuthenticationError, ProviderTimeoutError
 
 def setup_logging(verbose: bool = False) -> None:
     """
