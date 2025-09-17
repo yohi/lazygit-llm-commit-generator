@@ -46,7 +46,26 @@ def setup_logging(verbose: bool = False) -> None:
         level=level,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
-            logging.FileHandler('/tmp/lazygit-llm.log'),
+import tempfile
+from pathlib import Path
+
+def setup_logging(verbose: bool = False) -> None:
+    """
+    ロギング設定を初期化
+
+    Args:
+        verbose: 詳細ログを有効にする場合True
+    """
+    level = logging.DEBUG if verbose else logging.INFO
+    log_file = Path(tempfile.gettempdir()) / 'lazygit-llm.log'
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(str(log_file)),
+            logging.StreamHandler(sys.stderr) if verbose else logging.NullHandler()
+        ]
+    )
             logging.StreamHandler(sys.stderr) if verbose else logging.NullHandler()
         ]
     )
