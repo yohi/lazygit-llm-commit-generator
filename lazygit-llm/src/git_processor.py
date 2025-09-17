@@ -12,6 +12,8 @@ from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
 from io import StringIO
 
+from .security_validator import SecurityValidator
+
 logger = logging.getLogger(__name__)
 
 
@@ -49,6 +51,7 @@ class GitDiffProcessor:
         """
         self.max_diff_size = max_diff_size
         self._cached_diff_data: Optional[DiffData] = None
+        self.security_validator = SecurityValidator()
 
     def read_staged_diff(self) -> str:
         """
@@ -69,11 +72,19 @@ class GitDiffProcessor:
             # 標準入力から差分データを読み取り
             diff_content = sys.stdin.read()
 
-            # サイズ制限チェック
-            if len(diff_content.encode('utf-8')) > self.max_diff_size:
-                logger.warning(f"差分サイズが上限を超過: {len(diff_content)} > {self.max_diff_size}")
-                # 差分を切り詰める
-                diff_content = self._truncate_diff(diff_content)
+            # セキュリティバリデーターで差分をサニタイゼーション
+            sanitized_diff, security_result = self.security_validator.sanitize_git_diff(diff_content)
+
+            if not security_result.is_valid:
+                logger.error(f"差分セキュリティチェック失敗: {security_result.message}")
+                raise GitError(f"セキュリティエラー: {security_result.message}")
+
+            if security_result.level == "warning":
+                logger.warning(f"差分セキュリティ警告: {security_result.message}")
+                for rec in security_result.recommendations:
+                    logger.warning(f"推奨: {rec}")
+
+            diff_content = sanitized_diff
 
             # 差分データをキャッシュ用に解析
             self._cached_diff_data = self._parse_diff(diff_content)

@@ -12,6 +12,8 @@ from typing import Dict, Any, Optional, Union
 from pathlib import Path
 from dataclasses import dataclass, field
 
+from .security_validator import SecurityValidator
+
 logger = logging.getLogger(__name__)
 
 
@@ -44,6 +46,7 @@ class ConfigManager:
         """設定マネージャーを初期化"""
         self.config: Dict[str, Any] = {}
         self._config_path: Optional[str] = None
+        self.security_validator = SecurityValidator()
 
         # サポートされているプロバイダーの定義
         self.supported_providers = {
@@ -74,7 +77,14 @@ class ConfigManager:
             raise ConfigError(f"設定ファイルが見つかりません: {config_path}")
 
         # ファイル権限をチェック（セキュリティ要件）
-        self._check_file_permissions(config_file)
+        permission_result = self.security_validator.check_file_permissions(str(config_file))
+        if permission_result.level == "warning":
+            logger.warning(f"設定ファイル権限警告: {permission_result.message}")
+            for rec in permission_result.recommendations:
+                logger.warning(f"推奨: {rec}")
+        elif permission_result.level == "danger":
+            logger.error(f"設定ファイル権限エラー: {permission_result.message}")
+            raise ConfigError(f"セキュリティエラー: {permission_result.message}")
 
         try:
             with open(config_file, 'r', encoding='utf-8') as f:
@@ -122,9 +132,15 @@ class ConfigManager:
         if not api_key:
             raise ConfigError(f"APIキーが見つかりません（プロバイダー: {provider}）")
 
-        # APIキーの基本的な形式チェック
-        if len(api_key.strip()) < 10:
-            raise ConfigError(f"APIキーが短すぎます（プロバイダー: {provider}）")
+        # セキュリティバリデーターでAPIキーを検証
+        validation_result = self.security_validator.validate_api_key(provider, api_key.strip())
+        if not validation_result.is_valid:
+            raise ConfigError(f"APIキー検証エラー（{provider}）: {validation_result.message}")
+
+        if validation_result.level == "warning":
+            logger.warning(f"APIキー警告（{provider}）: {validation_result.message}")
+            for rec in validation_result.recommendations:
+                logger.warning(f"推奨: {rec}")
 
         return api_key.strip()
 
