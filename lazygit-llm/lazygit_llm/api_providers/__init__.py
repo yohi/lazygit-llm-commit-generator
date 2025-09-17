@@ -7,14 +7,14 @@ REST API経由でLLMサービスにアクセスするプロバイダー群:
 - Google Gemini API
 """
 
-from typing import Dict, Type
+from typing import Type
 import logging
 from ..base_provider import BaseProvider
 
 logger = logging.getLogger(__name__)
 
-# プロバイダー登録レジストリ（実装時に各プロバイダーが追加）
-API_PROVIDERS: Dict[str, Type[BaseProvider]] = {}
+# プロバイダー登録レジストリ(実装時に各プロバイダーが追加)
+API_PROVIDERS: dict[str, Type[BaseProvider]] = {}
 
 
 def register_provider(name: str, provider_class: Type[BaseProvider]) -> None:
@@ -25,9 +25,12 @@ def register_provider(name: str, provider_class: Type[BaseProvider]) -> None:
         name: プロバイダー名
         provider_class: プロバイダークラス
     """
-    if name in API_PROVIDERS:
-        logger.warning("API provider '%s' を上書き登録します", name)
-    API_PROVIDERS[name] = provider_class
+    norm = name.strip().lower()
+    if not isinstance(provider_class, type) or not issubclass(provider_class, BaseProvider):
+        raise TypeError("provider_class は BaseProvider のサブクラスである必要があります")
+    if norm in API_PROVIDERS:
+        logger.warning("API provider '%s' を上書き登録します", norm)
+    API_PROVIDERS[norm] = provider_class
 
 
 def get_available_providers() -> list[str]:
@@ -37,4 +40,12 @@ def get_available_providers() -> list[str]:
     Returns:
         プロバイダー名のリスト
     """
-    return list(API_PROVIDERS.keys())
+    return sorted(API_PROVIDERS.keys())
+
+
+def get_provider_class(name: str) -> Type[BaseProvider] | None:
+    """名前でAPIプロバイダーのクラスを取得（見つからない場合はNone）。"""
+    return API_PROVIDERS.get(name.strip().lower())
+
+
+__all__ = ["register_provider", "get_available_providers", "get_provider_class", "API_PROVIDERS"]

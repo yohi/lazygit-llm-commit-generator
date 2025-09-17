@@ -3,7 +3,7 @@
 LazyGit LLM Commit Message Generator - メインエントリーポイント
 
 LazyGitのカスタムコマンドから呼び出される主要スクリプト。
-標準入力からGit差分を受け取り、LLMを使用してコミットメッセージを生成する。
+ステージ済みのGit差分を内部コマンドで取得し、LLMでコミットメッセージを生成する。
 
 使用方法:
     lazygit-llm-generate
@@ -39,13 +39,13 @@ def setup_logging(verbose: bool = False) -> None:
     """
     level = logging.DEBUG if verbose else logging.INFO
     log_file = Path(tempfile.gettempdir()) / 'lazygit-llm.log'
+    handlers = [logging.FileHandler(str(log_file), encoding='utf-8')]
+    if verbose:
+        handlers.append(logging.StreamHandler(sys.stderr))
     logging.basicConfig(
         level=level,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(str(log_file)),
-            logging.StreamHandler(sys.stderr) if verbose else logging.NullHandler()
-        ]
+        handlers=handlers,
     )
 
 
@@ -119,8 +119,8 @@ def test_configuration(config_manager: ConfigManager) -> bool:
             print("❌ プロバイダーへの接続に失敗しました")
             return False
 
-    except Exception as e:
-        logger.error(f"設定テスト中にエラー: {e}")
+    except (ProviderError, AuthenticationError, ProviderTimeoutError) as e:
+        logger.exception("設定テスト中にエラー")
         print(f"❌ 設定テストエラー: {e}")
         return False
 
@@ -177,17 +177,17 @@ def main() -> int:
         return 0
 
     except AuthenticationError as e:
-        logger.error(f"認証エラー: {e}")
-        print(f"❌ 認証エラー: APIキーを確認してください")
+        logger.exception("認証エラー")
+        print("❌ 認証エラー: APIキーを確認してください")
         return 1
 
     except ProviderTimeoutError as e:
-        logger.error(f"タイムアウトエラー: {e}")
-        print(f"❌ タイムアウト: ネットワーク接続を確認してください")
+        logger.exception("タイムアウトエラー")
+        print("❌ タイムアウト: ネットワーク接続を確認してください")
         return 1
 
     except ProviderError as e:
-        logger.error(f"プロバイダーエラー: {e}")
+        logger.exception("プロバイダーエラー")
         print(f"❌ プロバイダーエラー: {e}")
         return 1
 
@@ -195,7 +195,7 @@ def main() -> int:
         print("⛔ 操作が中断されました")
         return 130
     except Exception as e:
-        logger.error(f"予期しないエラー: {e}")
+        logger.exception("予期しないエラー")
         print(f"❌ エラー: {e}")
         return 1
 
