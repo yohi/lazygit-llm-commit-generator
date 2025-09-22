@@ -54,7 +54,7 @@ class GeminiAPIProvider(BaseProvider):
 
         # Gemini APIクライアントを初期化
         self.api_key = config.get('api_key')
-        self.model_name = config.get('model_name', 'gemini-1.5-pro')
+        self.model_name = config.get('model_name', 'gemini-2.5-pro')
 
         if not self.api_key:
             raise AuthenticationError("Gemini APIキーが設定されていません")
@@ -362,6 +362,11 @@ class GeminiAPIProvider(BaseProvider):
             サポートされているモデル名のリスト
         """
         return [
+            # 最新GA版（2025年）
+            'gemini-2.5-pro',
+            'gemini-2.5-flash',
+            'gemini-2.5-flash-lite',  # プレビュー版
+            # 既存モデル（フォールバック）
             'gemini-1.5-pro',
             'gemini-1.5-flash',
             'gemini-1.0-pro',

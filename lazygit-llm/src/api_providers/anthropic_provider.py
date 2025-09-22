@@ -54,7 +54,7 @@ class AnthropicProvider(BaseProvider):
 
         # Anthropicクライアントを初期化
         self.api_key = config.get('api_key')
-        self.model = config.get('model_name', 'claude-3-5-sonnet-20241022')
+        self.model = config.get('model_name', 'claude-opus-4-1-20250805')
 
         if not self.api_key:
             raise AuthenticationError("Anthropic APIキーが設定されていません")
@@ -72,63 +72,6 @@ class AnthropicProvider(BaseProvider):
         self.top_p = additional_params.get('top_p', 1.0)
         self.max_retries = additional_params.get('max_retries', 3)
 
-    def generate_commit_message(self, diff: str, prompt_template: str) -> str:
-        """
-        Git差分からコミットメッセージを生成
-
-        Args:
-            diff: Git差分
-            prompt_template: プロンプトテンプレート
-
-        Returns:
-            生成されたコミットメッセージ
-
-        Raises:
-            AuthenticationError: API認証エラー
-            TimeoutError: タイムアウトエラー
-            ResponseError: レスポンスエラー
-            ProviderError: その他のプロバイダーエラー
-        """
-        if not diff or not diff.strip():
-            raise ProviderError("空の差分が提供されました")
-
-        prompt = self._format_prompt(diff, prompt_template)
-        logger.debug(f"Anthropic APIにリクエスト送信: model={self.model}, prompt_length={len(prompt)}")
-
-        try:
-            start_time = time.time()
-
-            # Anthropic API呼び出し
-            response = self._make_api_request(prompt)
-
-            elapsed_time = time.time() - start_time
-            logger.info(f"Anthropic API呼び出し完了: {elapsed_time:.2f}秒")
-
-            # レスポンスの検証
-            if not self._validate_response(response):
-                raise ResponseError("Anthropic APIから無効なレスポンスを受信しました")
-
-            return response
-
-        except anthropic.AuthenticationError as e:
-            logger.error(f"Anthropic認証エラー: {e}")
-            raise AuthenticationError(f"Anthropic API認証に失敗しました: {e}")
-
-        except anthropic.RateLimitError as e:
-            logger.error(f"Anthropic APIレート制限エラー: {e}")
-            raise ProviderError(f"Anthropic APIレート制限に達しました: {e}")
-
-        except anthropic.APITimeoutError as e:
-            logger.error(f"Anthropic APIタイムアウト: {e}")
-            raise TimeoutError(f"Anthropic APIがタイムアウトしました: {e}")
-
-        except anthropic.APIError as e:
-            logger.error(f"Anthropic APIエラー: {e}")
-            raise ProviderError(f"Anthropic APIエラー: {e}")
-
-        except Exception as e:
-            logger.error(f"Anthropic API呼び出し中に予期しないエラー: {e}")
-            raise ProviderError(f"Anthropic API呼び出しに失敗しました: {e}")
 
     def test_connection(self) -> bool:
         """
@@ -162,11 +105,11 @@ class AnthropicProvider(BaseProvider):
 
         except anthropic.AuthenticationError as e:
             logger.error(f"Anthropic認証エラー: {e}")
-            raise AuthenticationError(f"Anthropic API認証に失敗しました: {e}")
+            raise AuthenticationError(f"Anthropic API認証に失敗しました: {e}") from e
 
         except Exception as e:
             logger.error(f"Anthropic API接続テストエラー: {e}")
-            raise ProviderError(f"Anthropic API接続テストに失敗しました: {e}")
+            raise ProviderError(f"Anthropic API接続テストに失敗しました: {e}") from e
 
     def supports_streaming(self) -> bool:
         """
@@ -225,11 +168,11 @@ class AnthropicProvider(BaseProvider):
 
         except anthropic.AuthenticationError as e:
             logger.error(f"Anthropicストリーミング認証エラー: {e}")
-            raise AuthenticationError(f"Anthropic API認証に失敗しました: {e}")
+            raise AuthenticationError(f"Anthropic API認証に失敗しました: {e}") from e
 
         except Exception as e:
             logger.error(f"Anthropicストリーミングエラー: {e}")
-            raise ProviderError(f"Anthropicストリーミングに失敗しました: {e}")
+            raise ProviderError(f"Anthropicストリーミングに失敗しました: {e}") from e
 
     def get_required_config_fields(self) -> list[str]:
         """
@@ -277,14 +220,14 @@ class AnthropicProvider(BaseProvider):
                 last_exception = e
                 if attempt < self.max_retries - 1:
                     wait_time = 2 ** attempt  # 指数バックオフ
-                    logger.warning(f"Anthropic APIエラー、{wait_time}秒後にリトライ（{attempt + 1}/{self.max_retries}）: {e}")
+                    logger.warning(f"Anthropic APIエラー、{wait_time}秒後にリトライ({attempt + 1}/{self.max_retries}): {e}")
                     time.sleep(wait_time)
                 else:
-                    raise e
+                    raise
 
             except Exception as e:
                 # リトライしないエラー
-                raise e
+                raise
 
         # すべてのリトライが失敗した場合
         if last_exception:
@@ -300,7 +243,15 @@ class AnthropicProvider(BaseProvider):
             サポートされているモデル名のリスト
         """
         return [
+            # 最新モデル（2025年リリース）
+            'claude-opus-4-1-20250805',
+            'claude-opus-4-20250514',
+            'claude-sonnet-4-20250514',
+            'claude-3-7-sonnet-20250219',
+            'claude-3-7-sonnet-latest',  # エイリアス
+            # 既存モデル
             'claude-3-5-sonnet-20241022',
+            'claude-3-5-haiku-20241022',
             'claude-3-opus-20240229',
             'claude-3-sonnet-20240229',
             'claude-3-haiku-20240307',
