@@ -43,18 +43,22 @@
   - ✅ リトライ機能と接続テスト実装完了
   - _Requirements: 7.1, 7.2, 6.1, 6.4_
 
-- [ ] 6. Implement Anthropic Claude API provider
-  - Create AnthropicProvider class with Claude API integration
-  - Add model-specific configuration and request formatting
-  - Implement Claude-specific error handling and response parsing
-  - Add timeout and retry logic for API calls
+- [x] 6. Implement Anthropic Claude API provider
+  - ✅ AnthropicProvider class実装完了（329行）
+  - ✅ Claude API統合とClaude-3.5全モデル対応完了
+  - ✅ Claude向けプロンプト最適化とリクエストフォーマット実装完了
+  - ✅ Claude固有のエラーハンドリングとレスポンス解析実装完了
+  - ✅ タイムアウト・リトライ機能とストリーミング対応実装完了
+  - ✅ max_tokens_to_sample等のClaude固有設定対応完了
   - _Requirements: 7.1, 7.2, 6.1, 6.4_
 
-- [ ] 7. Implement Google Gemini API provider
-  - Create GeminiAPIProvider class with Gemini API client
-  - Add Gemini-specific prompt formatting and safety settings
-  - Implement response parsing and error handling
-  - Add support for different Gemini model variants
+- [x] 7. Implement Google Gemini API provider
+  - ✅ GeminiAPIProvider class実装完了（323行）
+  - ✅ Gemini API client統合とGemini 1.5全モデル対応完了
+  - ✅ Gemini固有のプロンプトフォーマットと安全設定実装完了
+  - ✅ レスポンス解析とエラーハンドリング実装完了
+  - ✅ Pro/Flash等の異なるGeminiモデル対応実装完了
+  - ✅ top_k/top_p等のGemini固有パラメータ対応実装完了
   - _Requirements: 7.1, 7.2, 6.1, 6.4_
 
 - [ ] 8. Implement Gemini CLI provider
