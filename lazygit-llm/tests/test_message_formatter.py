@@ -13,7 +13,7 @@ class TestMessageFormatter:
     """MessageFormatterクラスのテスト"""
 
     @pytest.fixture
-    def formatter(self):
+    def formatter(self, mock_logger):
         """テスト用のMessageFormatterインスタンス"""
         return MessageFormatter(max_length=50, default_message="feat: Update project")
 
@@ -149,9 +149,10 @@ with JWT tokens and user management."""
         input_text = "This is a long message with space near boundary point"
         result = formatter._apply_length_limit(input_text)
         assert result.endswith("...")
-        # 単語の途中で切れていないことを確認
-        words = result[:-3].strip().split()
-        # 最後の単語が完全であることを確認（実際の実装による）
+        # 単語の途中で切れていないことを確認（省略記号の前の文字が英数字でないことを確認）
+        import re
+        char_before_ellipsis = result[-4]  # "..."の前の文字
+        assert not re.match(r'\w', char_before_ellipsis), "単語の途中で切り詰められています"
         assert len(result) <= formatter.max_length
 
     def test_apply_length_limit_punctuation_trimming_and_ellipsis(self, formatter):
@@ -216,20 +217,22 @@ with JWT tokens and user management."""
         def complex_function():
             return "test"
         ```
-        
+
         Commit message: "Add a very long and complex commit message that includes code blocks, quotes, and exceeds the maximum length limit to test the complete pipeline"
-        
+
         This is additional text that should be ignored.
         '''
-        
+
         result = formatter.format_response(complex_input)
-        
+
         # 結果の検証
         assert isinstance(result, str)
         assert len(result) <= formatter.max_length
         assert "```" not in result
         assert result.startswith("Add a very long")
         assert result.endswith("...")
+        # トリミング時の警告が出ていること
+        assert mock_logger.warning.called
 
     def test_format_response_with_multiple_processing_steps(self, formatter):
         """複数の処理ステップを含む統合テスト"""
