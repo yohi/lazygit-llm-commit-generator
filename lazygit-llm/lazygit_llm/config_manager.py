@@ -7,7 +7,7 @@ YAML設定ファイルの読み込み、検証、環境変数展開を行う。
 import os
 import yaml
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -30,6 +30,7 @@ class ConfigManager:
         Raises:
             FileNotFoundError: 設定ファイルが見つからない
             yaml.YAMLError: YAML解析エラー
+            ValueError: 設定ファイルの構造が不正
         """
         config_file = Path(config_path)
         if not config_file.exists():
@@ -38,12 +39,19 @@ class ConfigManager:
         try:
             with open(config_file, 'r', encoding='utf-8') as f:
                 raw_config = yaml.safe_load(f)
+
+            # ルートは辞書である必要がある(空ファイルなどは {} とみなす)
+            if raw_config is None:
+                raw_config = {}
+            elif not isinstance(raw_config, dict):
+                logger.error("設定ファイルのルートは辞書である必要があります")
+                raise ValueError("設定ファイルのルートは辞書である必要があります")
             
             # 環境変数を展開
             self.config = self._expand_environment_variables(raw_config)
             logger.info("設定ファイルを読み込みました: %s", config_path)
             
-        except yaml.YAMLError as e:
+        except yaml.YAMLError:
             logger.exception("YAML解析エラー")
             raise
     
@@ -96,6 +104,10 @@ class ConfigManager:
         provider_type = provider_config.get('type')
         if not provider_type:
             logger.error("provider.type が設定されていません")
+            return False
+        
+        if not provider_config.get('name'):
+            logger.error("provider.name が設定されていません")
             return False
         
         return True

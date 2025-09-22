@@ -22,7 +22,6 @@ import argparse
 import logging
 import tempfile
 from pathlib import Path
-from typing import Optional
 
 from lazygit_llm.config_manager import ConfigManager
 from lazygit_llm.git_processor import GitDiffProcessor

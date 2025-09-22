@@ -6,7 +6,6 @@ Git差分処理モジュール
 
 import subprocess
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 

@@ -27,19 +27,20 @@ class ProviderFactory:
             作成されたプロバイダーインスタンス
             
         Raises:
+            TypeError: provider設定が辞書でない
             ValueError: 不正な設定
             RuntimeError: プロバイダーの作成に失敗
         """
         provider_config = config.get('provider', {})
         
         if not isinstance(provider_config, dict):
-            raise ValueError("provider設定が辞書ではありません")
+            raise TypeError("provider設定が辞書ではありません")
         
-        provider_type = provider_config.get('type')
+        provider_type = str(provider_config.get('type', '')).strip().lower()
         if not provider_type:
             raise ValueError("provider.type が設定されていません")
         
-        provider_name = provider_config.get('name')
+        provider_name = str(provider_config.get('name', '')).strip()
         if not provider_name:
             raise ValueError("provider.name が設定されていません")
         

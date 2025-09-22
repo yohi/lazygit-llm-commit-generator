@@ -26,10 +26,12 @@ def register_provider(name: str, provider_class: Type[BaseProvider]) -> None:
         provider_class: プロバイダークラス
     """
     norm = name.strip().lower()
+    if not norm:
+        raise ValueError("provider name は空にできません")
     if not isinstance(provider_class, type) or not issubclass(provider_class, BaseProvider):
         raise TypeError("provider_class は BaseProvider のサブクラスである必要があります")
     if norm in API_PROVIDERS:
-        logger.warning("API provider '%s' を上書き登録します", norm)
+        logger.warning("API provider '%s' (正規化名: '%s') を上書き登録します", name, norm)
     API_PROVIDERS[norm] = provider_class
 
 

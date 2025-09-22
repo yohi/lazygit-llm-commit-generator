@@ -6,7 +6,7 @@ CLI型LLMプロバイダーモジュール
 - Claude Code CLI (claude-code)
 """
 
-from typing import Optional, Type
+from typing import Type
 import logging
 from ..base_provider import BaseProvider
 
@@ -25,10 +25,12 @@ def register_provider(name: str, provider_class: Type[BaseProvider]) -> None:
         provider_class: プロバイダークラス
     """
     norm = name.strip().lower()
+    if not norm:
+        raise ValueError("provider name は空にできません")
     if not isinstance(provider_class, type) or not issubclass(provider_class, BaseProvider):
         raise TypeError("provider_class は BaseProvider のサブクラスである必要があります")
     if norm in CLI_PROVIDERS:
-        logger.warning("CLI provider '%s' を上書き登録します", norm)
+        logger.warning("CLI provider '%s' (正規化名: '%s') を上書き登録します", name, norm)
     CLI_PROVIDERS[norm] = provider_class
 
 
@@ -42,8 +44,8 @@ def get_available_providers() -> list[str]:
     return sorted(CLI_PROVIDERS.keys())
 
 
-def get_provider_class(name: str) -> Optional[Type[BaseProvider]]:
-    """名前でCLIプロバイダーのクラスを取得（見つからない場合はNone）。"""
+def get_provider_class(name: str) -> Type[BaseProvider] | None:
+    """名前でCLIプロバイダーのクラスを取得(見つからない場合はNone)。"""
     return CLI_PROVIDERS.get(name.strip().lower())
 
 

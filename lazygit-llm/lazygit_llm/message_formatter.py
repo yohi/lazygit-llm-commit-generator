@@ -6,7 +6,6 @@ LLMが生成したコミットメッセージをLazyGit用に整形する。
 
 import re
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +101,7 @@ class MessageFormatter:
         # 引用符を除去
         message = message.strip().strip('"').strip("'").strip('`')
         
-        # 最初の行を取得（複数行の場合）
+        # 最初の行を取得(複数行の場合)
         first_line = message.split('\n')[0].strip()
         
         if first_line:
@@ -127,15 +126,16 @@ class MessageFormatter:
         """
         if len(message) <= self.max_length:
             return message
-        
-        # 単語境界で切り詰め
-        truncated = message[:self.max_length]
+
+        # 省略記号分を確保
+        limit = max(0, self.max_length - 3)
+        truncated = message[:limit]
         last_space = truncated.rfind(' ')
-        
-        if last_space > self.max_length * 0.7:  # 70%以上の位置に空白がある場合
+
+        if last_space > int(limit * 0.7):  # 70%以上の位置に空白がある場合
             truncated = truncated[:last_space]
-        
-        # 末尾の句読点を除去して省略記号を追加
+
+        # 末尾の句読点を除去して省略記号を追加(最終長は必ず self.max_length 以下)
         truncated = truncated.rstrip('.,!?;:').rstrip() + '...'
         
         logger.warning("メッセージが長すぎるため切り詰めました: %d -> %d文字", 
@@ -160,7 +160,7 @@ class MessageFormatter:
         if len(message.strip()) < 3:
             return False
         
-        # 不正な文字のチェック（制御文字）
+        # 不正な文字のチェック(制御文字)
         if any(ord(c) < 0x20 and c not in '\n\t' for c in message):
             return False
         

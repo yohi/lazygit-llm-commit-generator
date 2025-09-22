@@ -183,7 +183,6 @@ benchmark_results/
 # Backup files
 *.bak
 *.backup
-*~
 
 # Node.js (if any frontend components)
 node_modules/
