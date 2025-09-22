@@ -85,7 +85,7 @@ class ErrorHandler:
         error_type = type(error).__name__
         error_message = str(error)
 
-        logger.error(f"エラーを処理中: {error_type} - {error_message}")
+        logger.error(f"エラーを処理中: {error_type} - {self._sanitize_message(error_message)}")
         if context:
             logger.error(f"コンテキスト: {context}")
 
@@ -156,7 +156,7 @@ class ErrorHandler:
                     "設定ファイルの所有者が正しいか確認してください"
                 ],
                 recovery_possible=True,
-                exit_code=2
+                exit_code=10
             )
 
         else:
@@ -186,12 +186,12 @@ class ErrorHandler:
         """
         error_message = str(error)
 
-        if "No staged files found" in error_message:
+        if "no staged files found" in error_message.lower():
             return ErrorInfo(
                 category=ErrorCategory.GIT,
                 severity=ErrorSeverity.LOW,
                 message="ステージされたファイルがありません",
-                user_message="ステージされたファイルがありません（No staged files found）",
+                user_message="ステージされたファイルがありません",
                 suggestions=[
                     "git add <files> でファイルをステージしてください",
                     "変更があるファイルを確認してください: git status"
@@ -296,7 +296,9 @@ class ErrorHandler:
                     exit_code=6
                 )
 
-            elif "rate limit" in error_message.lower() or "quota" in error_message.lower():
+            elif ("rate limit" in error_message.lower()
+                  or "quota" in error_message.lower()
+                  or "429" in error_message):
                 return ErrorInfo(
                     category=ErrorCategory.PROVIDER,
                     severity=ErrorSeverity.MEDIUM,
@@ -409,7 +411,7 @@ class ErrorHandler:
 
         # 技術的詳細の表示（verbose mode）
         if self.verbose and error_info.technical_details:
-            print(f"\n🔧 技術的詳細:\n{error_info.technical_details}", file=sys.stderr)
+            logger.debug(f"技術的詳細: {self._sanitize_message(error_info.technical_details)}")
 
         # 回復不可能なエラーの場合
         if not error_info.recovery_possible:
@@ -499,9 +501,21 @@ class ErrorHandler:
         """機密情報をマスクする"""
         # APIキー、トークン等をマスク
         patterns = [
-            (r'api[_-]?key[=:]\s*["\']?([^"\'\\s]+)', r'api_key=***'),
-            (r'token[=:]\s*["\']?([^"\'\\s]+)', r'token=***'),
-            (r'password[=:]\s*["\']?([^"\'\\s]+)', r'password=***'),
+            # 汎用
+            (r'api[_-]?key[=:]\s*["\']?([^"\'\s]+)', r'api_key=***'),
+            (r'token[=:]\s*["\']?([^"\'\s]+)', r'token=***'),
+            (r'password[=:]\s*["\']?([^"\'\s]+)', r'password=***'),
+            # 環境変数系
+            (r'(OPENAI_API_KEY|ANTHROPIC_API_KEY|GOOGLE_API_KEY)\s*[:=]\s*["\']?([A-Za-z0-9_\-]+)', r'\1=***'),
+            # 代表的フォーマット
+            (r'(sk-[A-Za-z0-9]{16,})', r'***'),
+            (r'(ghp_[A-Za-z0-9]{20,})', r'***'),
+            (r'(xox[abpsr]-[A-Za-z0-9\-]{10,})', r'***'),
+            (r'(ya29\.[A-Za-z0-9\-_]+)', r'***'),
+            (r'(AIza[0-9A-Za-z\-_]{35})', r'***'),
+            # Bearer/JWT（簡易）
+            (r'Bearer\s+[A-Za-z0-9\-_\.]{20,}', r'Bearer ***'),
+            (r'\beyJ[A-Za-z0-9_\-]+=*\.[A-Za-z0-9_\-]+=*(?:\.[A-Za-z0-9_\-+=/]*)?', r'***'),
         ]
         sanitized = message
         for pattern, replacement in patterns:
@@ -546,5 +560,6 @@ class ErrorHandler:
         Returns:
             終了コード
         """
-        error_info = self.handle_error(error)
-        return error_info.exit_code
+        error_message = str(error)
+        classified = self._classify_error(error, error_message, context=None)
+        return classified.exit_code
