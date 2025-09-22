@@ -5,8 +5,7 @@ MessageFormatterクラスの包括的なテストモジュール
 """
 
 import pytest
-import logging
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 from lazygit_llm.message_formatter import MessageFormatter
 
 
