@@ -3,11 +3,13 @@ Git差分処理システム
 
 標準入力からGitの差分データを読み取り、LLM向けにフォーマットする。
 LazyGitとの統合でステージされた変更の検証も行う。
+また、subprocess経由でのgitコマンド実行による差分取得もサポートする。
 """
 
 import sys
 import re
 import logging
+import subprocess
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
 from io import StringIO
@@ -38,6 +40,7 @@ class GitDiffProcessor:
 
     標準入力からgit diffの出力を読み取り、解析してLLM向けにフォーマットする。
     LazyGitとの統合において、ステージされた変更の有無を確認する機能も提供。
+    subprocess経由でのgitコマンド実行による差分取得もサポート。
     """
 
     def __init__(self, max_diff_size: int = 50000):
@@ -52,10 +55,11 @@ class GitDiffProcessor:
 
     def read_staged_diff(self) -> str:
         """
-        標準入力からステージされた変更の差分を読み取り
+        標準入力またはgitコマンド経由でステージされた変更の差分を読み取り
 
         この関数はLazyGitから `git diff --staged` の出力を
         標準入力経由で受け取ることを想定している。
+        標準入力が利用できない場合は、gitコマンドを直接実行する。
 
         Returns:
             読み取られた差分データ（文字列）
@@ -64,10 +68,21 @@ class GitDiffProcessor:
             GitError: 差分の読み取りに失敗した場合
         """
         try:
-            logger.debug("標準入力からGit差分を読み取り開始")
+            logger.debug("Git差分を読み取り開始")
 
-            # 標準入力から差分データを読み取り
-            diff_content = sys.stdin.read()
+            # 標準入力からの読み取りを試行
+            diff_content = None
+            if not sys.stdin.isatty():
+                try:
+                    diff_content = sys.stdin.read()
+                    logger.debug("標準入力からGit差分を読み取り")
+                except:
+                    logger.debug("標準入力からの読み取りに失敗、gitコマンドを使用")
+                    diff_content = None
+
+            # 標準入力が利用できない場合はgitコマンドを実行
+            if diff_content is None:
+                diff_content = self._read_diff_via_git()
 
             # サイズ制限チェック
             if len(diff_content.encode('utf-8')) > self.max_diff_size:
@@ -87,28 +102,73 @@ class GitDiffProcessor:
             logger.error(f"Git差分読み取りエラー: {e}")
             raise GitError(f"差分の読み取りに失敗しました: {e}")
 
+    def _read_diff_via_git(self) -> str:
+        """
+        gitコマンド経由でステージ済みの差分を取得する
+
+        Returns:
+            Git差分の文字列
+
+        Raises:
+            GitError: gitコマンド実行エラー
+        """
+        try:
+            result = subprocess.run(
+                ['git', 'diff', '--cached'],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            if result.returncode != 0:
+                error_msg = f"git diff --cached が失敗しました: {result.stderr}"
+                logger.error(error_msg)
+                raise GitError(error_msg)
+
+            diff_output = result.stdout.strip()
+            logger.debug("gitコマンド経由でGit差分を取得しました (%d文字)", len(diff_output))
+
+            return diff_output
+
+        except subprocess.TimeoutExpired as err:
+            error_msg = "git diff --cached がタイムアウトしました"
+            logger.error(error_msg)
+            raise GitError(error_msg) from err
+        except FileNotFoundError as err:
+            error_msg = "gitコマンドが見つかりません"
+            logger.error(error_msg)
+            raise GitError(error_msg) from err
+
     def has_staged_changes(self) -> bool:
         """
         ステージされた変更があるかどうかを確認
 
+        subprocess経由でgit diff --cached --quietを実行して確認する
+
         Returns:
             ステージされた変更がある場合True、ない場合False
         """
-        if self._cached_diff_data is None:
-            # まだ差分を読み取っていない場合は読み取りを試行
-            try:
-                self.read_staged_diff()
-            except GitError:
-                return False
+        try:
+            result = subprocess.run(
+                ['git', 'diff', '--cached', '--quiet'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            # git diff --quiet は変更がある場合は1、ない場合は0を返す
+            has_changes = result.returncode != 0
+            logger.debug("ステージ済み変更チェック: %s", has_changes)
+            return has_changes
 
-        # 空の差分または実質的な変更がない場合はFalse
-        if not self._cached_diff_data or not self._cached_diff_data.raw_diff.strip():
+        except subprocess.TimeoutExpired:
+            logger.exception("git diff --cached --quiet がタイムアウトしました")
             return False
-
-        # ファイル数または変更行数で判定
-        return (self._cached_diff_data.file_count > 0 or
-                self._cached_diff_data.additions > 0 or
-                self._cached_diff_data.deletions > 0)
+        except FileNotFoundError:
+            logger.exception("gitコマンドが見つかりません")
+            return False
+        except Exception:
+            logger.exception("ステージ済み変更のチェックに失敗")
+            return False
 
     def format_diff_for_llm(self, diff: str) -> str:
         """
@@ -181,6 +241,62 @@ class GitDiffProcessor:
             'has_binary_changes': self._cached_diff_data.is_binary_change,
             'total_lines': self._cached_diff_data.total_lines
         }
+
+    def get_repository_status(self) -> dict:
+        """
+        リポジトリの状態を取得する
+
+        Returns:
+            リポジトリの状態辞書
+        """
+        try:
+            # ブランチ名を取得
+            branch_result = subprocess.run(
+                ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            current_branch = branch_result.stdout.strip() if branch_result.returncode == 0 else "unknown"
+
+            # ステージ済み/未ステージファイル数を取得
+            status_result = subprocess.run(
+                ['git', 'status', '--porcelain'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+
+            staged_files = 0
+            unstaged_files = 0
+
+            if status_result.returncode == 0:
+                for line in status_result.stdout.splitlines():
+                    if not line or len(line) < 2:
+                        continue
+                    # 無視ファイルは "!!" で始まる
+                    if line.startswith('!!'):
+                        continue
+                    staged_char = line[0]
+                    unstaged_char = line[1]
+                    if staged_char not in (' ', '?'):
+                        staged_files += 1
+                    if unstaged_char != ' ':
+                        unstaged_files += 1
+
+            return {
+                'current_branch': current_branch,
+                'staged_files': staged_files,
+                'unstaged_files': unstaged_files
+            }
+
+        except Exception:
+            logger.exception("リポジトリ状態の取得に失敗")
+            return {
+                'current_branch': "unknown",
+                'staged_files': 0,
+                'unstaged_files': 0
+            }
 
     def _parse_diff(self, diff_content: str) -> DiffData:
         """

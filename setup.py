@@ -17,7 +17,7 @@ setup(
     description="LLM-powered commit message generator for LazyGit",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/example/lazygit-llm-commit-generator",
+    url="https://github.com/yohi/lazygit-llm-commit-generator",
     packages=find_packages(where="lazygit-llm"),
     package_dir={"": "lazygit-llm"},
     classifiers=[
@@ -55,12 +55,12 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "lazygit-llm-generate=src.main:main",
+            "lazygit-llm-generate=lazygit_llm.main:main",
         ],
     },
     include_package_data=True,
     package_data={
-        "": ["config/*.yml", "docs/*.md"],
+        "": ["config/*.yml", "config/*.yml.example", "docs/*.md"],
     },
     zip_safe=False,
 )
