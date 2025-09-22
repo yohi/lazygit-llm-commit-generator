@@ -1,3 +1,4 @@
+# ruff: noqa: RUF001, RUF002, RUF003
 """
 包括的エラーハンドリングシステム
 
@@ -6,6 +7,7 @@
 """
 
 import logging
+import re
 import sys
 import traceback
 from typing import Dict, Any, Optional, List, Union
@@ -67,7 +69,7 @@ class ErrorHandler:
             verbose: 詳細エラー情報を表示するかどうか
         """
         self.verbose = verbose
-        self._error_registry = self._build_error_registry()
+        self._error_registry = self._build_error_registry()  # TODO: カスタムエラーハンドラー登録機能で使用予定
 
     def handle_error(self, error: Exception, context: Optional[str] = None) -> ErrorInfo:
         """
@@ -189,7 +191,7 @@ class ErrorHandler:
                 category=ErrorCategory.GIT,
                 severity=ErrorSeverity.LOW,
                 message="ステージされたファイルがありません",
-                user_message="No staged files found",
+                user_message="ステージされたファイルがありません（No staged files found）",
                 suggestions=[
                     "git add <files> でファイルをステージしてください",
                     "変更があるファイルを確認してください: git status"
@@ -238,7 +240,6 @@ class ErrorHandler:
             プロバイダーエラー情報
         """
         error_message = str(error)
-        error_type = type(error).__name__
 
         if isinstance(error, AuthenticationError):
             return ErrorInfo(
@@ -286,7 +287,7 @@ class ErrorHandler:
         else:  # ProviderError
             if "not found" in error_message.lower() or "見つかりません" in error_message:
                 return ErrorInfo(
-                    category=ErrorCategory.SYSTEM,
+                    category=ErrorCategory.CONFIGURATION,
                     severity=ErrorSeverity.HIGH,
                     message=f"プロバイダーセットアップエラー: {error_message}",
                     user_message="LLMプロバイダーのセットアップに問題があります",
@@ -433,10 +434,13 @@ class ErrorHandler:
             return self.handle_provider_error(error)
         elif isinstance(error, (ImportError, PermissionError)):
             return self.handle_system_error(error)
-        elif "git" in error_message.lower() or "Git" in error_message:
-            return self.handle_git_error(error)
         else:
-            return self.handle_system_error(error)
+            # メッセージとコンテキスト双方を用いてGit関連を検出
+            blob = f"{error_message} {context or ''}".lower()
+            if "git" in blob:
+                return self.handle_git_error(error)
+            else:
+                return self.handle_system_error(error)
 
     def _get_auth_suggestions(self, error_message: str) -> List[str]:
         """認証エラー用の提案を生成"""
@@ -489,7 +493,20 @@ class ErrorHandler:
 
     def _get_technical_details(self, error: Exception) -> str:
         """技術的詳細を取得"""
-        return traceback.format_exc()
+        return "".join(traceback.TracebackException.from_exception(error).format())
+
+    def _sanitize_message(self, message: str) -> str:
+        """機密情報をマスクする"""
+        # APIキー、トークン等をマスク
+        patterns = [
+            (r'api[_-]?key[=:]\s*["\']?([^"\'\\s]+)', r'api_key=***'),
+            (r'token[=:]\s*["\']?([^"\'\\s]+)', r'token=***'),
+            (r'password[=:]\s*["\']?([^"\'\\s]+)', r'password=***'),
+        ]
+        sanitized = message
+        for pattern, replacement in patterns:
+            sanitized = re.sub(pattern, replacement, sanitized, flags=re.IGNORECASE)
+        return sanitized
 
     def _log_error(self, error_info: ErrorInfo, original_error: Exception) -> None:
         """エラーをログに記録"""
@@ -501,10 +518,15 @@ class ErrorHandler:
         }
 
         level = log_level.get(error_info.severity, logging.ERROR)
-        logger.log(level, f"[{error_info.category.value}] {error_info.message}")
+        sanitized = self._sanitize_message(error_info.message)
+        logger.log(
+            level,
+            f"[{error_info.category.value}] {sanitized}",
+            exc_info=original_error if self.verbose else None,
+        )
 
         if error_info.technical_details:
-            logger.debug(f"技術的詳細: {error_info.technical_details}")
+            logger.debug(f"技術的詳細: {self._sanitize_message(error_info.technical_details)}")
 
     def _build_error_registry(self) -> Dict[str, Any]:
         """エラーレジストリを構築（将来の拡張用）"""
