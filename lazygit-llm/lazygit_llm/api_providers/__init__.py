@@ -44,7 +44,7 @@ def get_available_providers() -> list[str]:
 
 
 def get_provider_class(name: str) -> Type[BaseProvider] | None:
-    """名前でAPIプロバイダーのクラスを取得（見つからない場合はNone）。"""
+    """名前でAPIプロバイダーのクラスを取得(見つからない場合はNone)。"""
     return API_PROVIDERS.get(name.strip().lower())
 
 

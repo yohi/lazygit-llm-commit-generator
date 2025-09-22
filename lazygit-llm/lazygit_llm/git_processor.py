@@ -71,14 +71,14 @@ class GitDiffProcessor:
             
             return diff_output
             
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as err:
             error_msg = "git diff --cached がタイムアウトしました"
             logger.error(error_msg)
-            raise subprocess.SubprocessError(error_msg)
-        except FileNotFoundError:
+            raise subprocess.SubprocessError(error_msg) from err
+        except FileNotFoundError as err:
             error_msg = "gitコマンドが見つかりません"
             logger.error(error_msg)
-            raise subprocess.SubprocessError(error_msg)
+            raise subprocess.SubprocessError(error_msg) from err
     
     def get_repository_status(self) -> dict:
         """
@@ -109,7 +109,7 @@ class GitDiffProcessor:
             unstaged_files = 0
             
             if status_result.returncode == 0:
-                for line in status_result.stdout.split('\\n'):
+                for line in status_result.stdout.splitlines():
                     if len(line.strip()) >= 2:
                         staged_char = line[0]
                         unstaged_char = line[1]
@@ -126,7 +126,7 @@ class GitDiffProcessor:
             }
             
         except Exception as e:
-            logger.error("リポジトリ状態の取得に失敗: %s", e)
+            logger.exception("リポジトリ状態の取得に失敗")
             return {
                 'current_branch': "unknown",
                 'staged_files': 0,

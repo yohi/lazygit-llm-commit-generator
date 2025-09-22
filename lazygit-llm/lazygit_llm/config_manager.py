@@ -44,7 +44,7 @@ class ConfigManager:
             logger.info("設定ファイルを読み込みました: %s", config_path)
             
         except yaml.YAMLError as e:
-            logger.error("YAML解析エラー: %s", e)
+            logger.exception("YAML解析エラー")
             raise
     
     def _expand_environment_variables(self, config: Dict[str, Any]) -> Dict[str, Any]:

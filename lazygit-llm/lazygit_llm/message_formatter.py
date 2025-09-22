@@ -63,10 +63,10 @@ class MessageFormatter:
         cleaned = message.strip()
         
         # 複数の改行を単一の改行に変換
-        cleaned = re.sub(r'\\n+', '\\n', cleaned)
+        cleaned = re.sub(r'\n+', '\n', cleaned)
         
         # タブを空白に変換
-        cleaned = cleaned.replace('\\t', ' ')
+        cleaned = cleaned.replace('\t', ' ')
         
         # 複数の空白を単一の空白に変換
         cleaned = re.sub(r' +', ' ', cleaned)
@@ -84,7 +84,7 @@ class MessageFormatter:
             抽出されたコミットメッセージ
         """
         # マークダウンのコードブロックを除去
-        message = re.sub(r'```[\\s\\S]*?```', '', message)
+        message = re.sub(r'```[\s\S]*?```', '', message)
         
         # 説明的なテキストを除去
         prefixes_to_remove = [
@@ -96,20 +96,20 @@ class MessageFormatter:
         ]
         
         for prefix in prefixes_to_remove:
-            pattern = re.compile(rf'^{re.escape(prefix)}\\s*', re.IGNORECASE)
+            pattern = re.compile(rf'^{re.escape(prefix)}\s*', re.IGNORECASE)
             message = pattern.sub('', message)
         
         # 引用符を除去
-        message = message.strip('\'""`')
+        message = message.strip().strip('"').strip("'").strip('`')
         
         # 最初の行を取得（複数行の場合）
-        first_line = message.split('\\n')[0].strip()
+        first_line = message.split('\n')[0].strip()
         
         if first_line:
             return first_line
         
         # フォールバック: 全体から最初の文を抽出
-        sentences = re.split(r'[.!?]\\s+', message)
+        sentences = re.split(r'[.!?]\s+', message)
         if sentences and sentences[0].strip():
             return sentences[0].strip()
         
@@ -160,9 +160,8 @@ class MessageFormatter:
         if len(message.strip()) < 3:
             return False
         
-        # 不正な文字のチェック
-        invalid_chars = ['\\x00', '\\x01', '\\x02', '\\x03', '\\x04']
-        if any(char in message for char in invalid_chars):
+        # 不正な文字のチェック（制御文字）
+        if any(ord(c) < 0x20 and c not in '\n\t' for c in message):
             return False
         
         return True

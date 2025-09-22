@@ -68,8 +68,8 @@ class ProviderFactory:
             logger.info("プロバイダーを作成しました: %s (%s)", provider_name, provider_type)
             return provider
         except Exception as e:
-            logger.error("プロバイダーの作成に失敗: %s", e)
-            raise RuntimeError(f"プロバイダー '{provider_name}' の作成に失敗しました: {e}")
+            logger.exception("プロバイダーの作成に失敗")
+            raise RuntimeError(f"プロバイダー '{provider_name}' の作成に失敗しました: {e}") from e
     
     def _get_available_api_providers(self) -> list:
         """
