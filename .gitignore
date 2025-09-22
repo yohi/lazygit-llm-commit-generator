@@ -200,3 +200,5 @@ yarn-error.log*
 local/
 dev/
 development/
+.serena/
+
