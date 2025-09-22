@@ -32,18 +32,77 @@ additional_params:
   temperature: 0.3
   top_p: 1.0
 
-  # Anthropic固有
-  # max_tokens_to_sample: 100
+# =============================================================================
+# 全プロバイダー設定例
+# =============================================================================
 
-  # Gemini固有
-  # safety_settings:
-  #   - category: "HARM_CATEGORY_DANGEROUS_CONTENT"
-  #     threshold: "BLOCK_MEDIUM_AND_ABOVE"
+# --- OpenAI設定例 ---
+# provider: "openai"
+# model_name: "gpt-4"  # gpt-4, gpt-3.5-turbo
+# api_key: "${OPENAI_API_KEY}"
+# additional_params:
+#   temperature: 0.3
+#   top_p: 1.0
 
-# 日本語コミットメッセージ用のプロンプト例（コメントアウト）
+# --- Anthropic Claude設定例 ---
+# provider: "anthropic"
+# model_name: "claude-3-5-sonnet-20241022"  # claude-3-opus-20240229, claude-3-sonnet-20240229
+# api_key: "${ANTHROPIC_API_KEY}"
+# additional_params:
+#   max_tokens_to_sample: 100
+
+# --- Google Gemini API設定例 ---
+# provider: "gemini-api"
+# model_name: "gemini-1.5-pro"  # gemini-1.0-pro, gemini-1.5-flash
+# api_key: "${GEMINI_API_KEY}"
+# additional_params:
+#   safety_settings:
+#     - category: "HARM_CATEGORY_DANGEROUS_CONTENT"
+#       threshold: "BLOCK_MEDIUM_AND_ABOVE"
+
+# --- Gemini CLI設定例（gcloud CLIを使用）---
+# provider: "gemini-cli"
+# model_name: "gemini-1.5-pro"
+# # CLIプロバイダーではapi_keyは不要（gcloud認証を使用）
+# additional_params:
+#   project_id: "your-gcp-project-id"
+#   location: "us-central1"
+
+# --- Claude Code CLI設定例 ---
+# provider: "claude-code"
+# model_name: "claude-3-5-sonnet-20241022"
+# # CLIプロバイダーではapi_keyは不要（Claude Code認証を使用）
+# additional_params:
+#   # Claude Code固有の設定があれば追加
+
+# =============================================================================
+# 言語別プロンプトテンプレート例
+# =============================================================================
+
+# 日本語コミットメッセージ用のプロンプト例
 # prompt_template: |
 #   以下のgit diffに基づいて、簡潔で分かりやすいコミットメッセージを日本語で生成してください：
 #
 #   $diff
 #
 #   コミットメッセージのみを出力してください。
+# Conventional Commits形式（英語）
+# prompt_template: |
+#   Based on the following git diff, generate a commit message following the Conventional Commits specification:
+#
+#   Format: <type>[optional scope]: <description>
+#   Types: feat, fix, docs, style, refactor, test, chore
+#
+#   $diff
+#
+#   Generate only the commit message, no additional text.
+
+# Gitmoji + Conventional Commits形式
+# prompt_template: |
+#   Based on the following git diff, generate a commit message with gitmoji and conventional commits format:
+#
+#   Format: <gitmoji> <type>[optional scope]: <description>
+#
+#   $diff
+#
+#   Generate only the commit message with appropriate emoji, no additional text.
