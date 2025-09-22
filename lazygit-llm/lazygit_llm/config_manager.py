@@ -5,6 +5,7 @@ YAML設定ファイルの読み込み、検証、環境変数展開を行う。
 """
 
 import os
+import re
 import yaml
 import logging
 from typing import Dict, Any
@@ -55,15 +56,15 @@ class ConfigManager:
             logger.exception("YAML解析エラー")
             raise
     
-    def _expand_environment_variables(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def _expand_environment_variables(self, config: Any) -> Any:
         """
-        設定内の環境変数を展開する
+        設定内の環境変数を再帰的に展開する
         
         Args:
-            config: 元の設定辞書
+            config: 設定の一部 (dict, list, strなど)
             
         Returns:
-            環境変数が展開された設定辞書
+            環境変数が展開された設定
         """
         if isinstance(config, dict):
             return {
@@ -73,11 +74,13 @@ class ConfigManager:
         elif isinstance(config, list):
             return [self._expand_environment_variables(item) for item in config]
         elif isinstance(config, str):
-            # ${VAR_NAME} 形式の環境変数を展開
-            if config.startswith('${') and config.endswith('}'):
-                var_name = config[2:-1]
-                return os.environ.get(var_name, config)
-            return config
+            # ${VAR} または ${VAR:default} を文字列中の任意位置で展開
+            pattern = re.compile(r'\${([^}:]+)(?::([^}]*))?}')
+            def repl(m: re.Match) -> str:
+                key = m.group(1)
+                default = m.group(2)
+                return os.environ.get(key, default if default is not None else m.group(0))
+            return pattern.sub(repl, config)
         else:
             return config
     
@@ -119,8 +122,10 @@ class ConfigManager:
         Returns:
             プロンプトテンプレート文字列
         """
-        return self.config.get('prompt_template', 
-                             'Generate a commit message for the following changes:\\n\\n$diff')
+        return self.config.get(
+            'prompt_template',
+            'Generate a commit message for the following changes:\n\n$diff',
+        )
     
     def get_provider_config(self) -> Dict[str, Any]:
         """

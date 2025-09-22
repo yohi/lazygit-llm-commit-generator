@@ -91,7 +91,7 @@ class BaseProvider(ABC):
                     if v <= 0:
                         raise ValueError
                 except (TypeError, ValueError):
-                    logger.error(f"数値設定が不正: {num_field}={self.config[num_field]!r}")
+                    logger.exception(f"数値設定が不正: {num_field}={self.config[num_field]!r}")
                     return False
         return True
 

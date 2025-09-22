@@ -50,4 +50,4 @@ def get_provider_class(name: str) -> Type[BaseProvider] | None:
     return API_PROVIDERS.get(name.strip().lower())
 
 
-__all__ = ["register_provider", "get_available_providers", "get_provider_class", "API_PROVIDERS"]
+__all__ = ["API_PROVIDERS", "get_available_providers", "get_provider_class", "register_provider"]

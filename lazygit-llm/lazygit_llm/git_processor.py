@@ -33,13 +33,13 @@ class GitDiffProcessor:
             return has_changes
             
         except subprocess.TimeoutExpired:
-            logger.error("git diff --cached --quiet がタイムアウトしました")
+            logger.exception("git diff --cached --quiet がタイムアウトしました")
             return False
         except FileNotFoundError:
-            logger.error("gitコマンドが見つかりません")
+            logger.exception("gitコマンドが見つかりません")
             return False
-        except Exception as e:
-            logger.error("ステージ済み変更のチェックに失敗: %s", e)
+        except Exception:
+            logger.exception("ステージ済み変更のチェックに失敗")
             return False
     
     def read_staged_diff(self) -> str:
@@ -109,14 +109,17 @@ class GitDiffProcessor:
             
             if status_result.returncode == 0:
                 for line in status_result.stdout.splitlines():
-                    if len(line.strip()) >= 2:
-                        staged_char = line[0]
-                        unstaged_char = line[1]
-                        
-                        if staged_char != ' ' and staged_char != '?':
-                            staged_files += 1
-                        if unstaged_char != ' ':
-                            unstaged_files += 1
+                    if not line or len(line) < 2:
+                        continue
+                    # 無視ファイルは "!!" で始まる
+                    if line.startswith('!!'):
+                        continue
+                    staged_char = line[0]
+                    unstaged_char = line[1]
+                    if staged_char not in (' ', '?'):
+                        staged_files += 1
+                    if unstaged_char != ' ':
+                        unstaged_files += 1
             
             return {
                 'current_branch': current_branch,
@@ -124,7 +127,7 @@ class GitDiffProcessor:
                 'unstaged_files': unstaged_files
             }
             
-        except Exception as e:
+        except Exception:
             logger.exception("リポジトリ状態の取得に失敗")
             return {
                 'current_branch': "unknown",

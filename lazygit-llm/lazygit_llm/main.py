@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 LazyGit LLM Commit Message Generator - メインエントリーポイント
 
@@ -18,6 +17,7 @@ LazyGit設定例:
 """
 
 import sys
+import os
 import argparse
 import logging
 import tempfile
@@ -37,7 +37,14 @@ def setup_logging(verbose: bool = False) -> None:
         verbose: 詳細ログを有効にする場合True
     """
     level = logging.DEBUG if verbose else logging.INFO
-    log_file = Path(tempfile.gettempdir()) / 'lazygit-llm.log'
+    # セキュリティを考慮して一意な名前のログファイルを作成
+    log_fd, log_file_path = tempfile.mkstemp(prefix='lazygit-llm-', suffix='.log', text=True)
+    os.close(log_fd)  # ファイルディスクリプタを閉じる
+    log_file = Path(log_file_path)
+    
+    if verbose:
+        print(f"ログファイル: {log_file}", file=sys.stderr)
+
     handlers = [logging.FileHandler(str(log_file), encoding='utf-8')]
     if verbose:
         handlers.append(logging.StreamHandler(sys.stderr))
@@ -172,15 +179,12 @@ def main() -> int:
         # LazyGitに出力
         print(formatted_message)
 
-        logger.info("コミットメッセージ生成完了")
-        return 0
-
-    except AuthenticationError as e:
+    except AuthenticationError:
         logger.exception("認証エラー")
         print("❌ 認証エラー: APIキーを確認してください")
         return 1
 
-    except ProviderTimeoutError as e:
+    except ProviderTimeoutError:
         logger.exception("タイムアウトエラー")
         print("❌ タイムアウト: ネットワーク接続を確認してください")
         return 1
@@ -197,6 +201,9 @@ def main() -> int:
         logger.exception("予期しないエラー")
         print(f"❌ エラー: {e}")
         return 1
+    else:
+        logger.info("コミットメッセージ生成完了")
+        return 0
 
 
 if __name__ == "__main__":

@@ -13,14 +13,16 @@ logger = logging.getLogger(__name__)
 class MessageFormatter:
     """メッセージフォーマッタークラス"""
     
-    def __init__(self, max_length: int = 500):
+    def __init__(self, max_length: int = 500, default_message: str = "chore: update files"):
         """
         フォーマッターを初期化
         
         Args:
             max_length: 最大メッセージ長
+            default_message: 空入力の場合のデフォルトメッセージ
         """
         self.max_length = max_length
+        self.default_message = default_message
     
     def format_response(self, raw_message: str) -> str:
         """
@@ -34,7 +36,7 @@ class MessageFormatter:
         """
         if not raw_message or not raw_message.strip():
             logger.warning("空のメッセージを受信しました")
-            return "chore: update files"
+            return self.default_message
         
         # 基本的なクリーニング
         cleaned = self._clean_message(raw_message)
@@ -60,6 +62,9 @@ class MessageFormatter:
         """
         # 先頭・末尾の空白を削除
         cleaned = message.strip()
+
+        # 改行をLFに正規化
+        cleaned = cleaned.replace('\r\n', '\n').replace('\r', '\n')
         
         # 複数の改行を単一の改行に変換
         cleaned = re.sub(r'\n+', '\n', cleaned)
