@@ -49,7 +49,7 @@ class GitDiffProcessor:
         Git差分プロセッサーを初期化
 
         Args:
-            max_diff_size: 処理する差分の最大サイズ（バイト）
+            max_diff_size: 処理する差分の最大サイズ(バイト)
         """
         self.max_diff_size = max_diff_size
         self._cached_diff_data: Optional[DiffData] = None
@@ -63,7 +63,7 @@ class GitDiffProcessor:
         標準入力が利用できない場合は、gitコマンドを直接実行する。
 
         Returns:
-            読み取られた差分データ（文字列）
+            読み取られた差分データ(文字列)
 
         Raises:
             GitError: 差分の読み取りに失敗した場合
@@ -71,7 +71,7 @@ class GitDiffProcessor:
         try:
             logger.debug("Git差分を読み取り開始")
 
-            # 標準入力からの読み取りを試行（サイズ上限を考慮）
+            # 標準入力からの読み取りを試行(サイズ上限を考慮)
             diff_content = None
             if not sys.stdin.isatty():
                 try:
@@ -223,7 +223,7 @@ class GitDiffProcessor:
                     formatted_lines.append(f"  - {file_path}")
                 formatted_lines.append("")
 
-            # 実際の差分内容（フィルタリング済み）
+            # 実際の差分内容(フィルタリング済み)
             filtered_diff = self._filter_diff_content(diff)
             if filtered_diff:
                 formatted_lines.append("Diff content:")
@@ -231,8 +231,8 @@ class GitDiffProcessor:
 
             return "\n".join(formatted_lines)
 
-        except Exception as e:
-            logger.error(f"差分フォーマットエラー: {e}")
+        except Exception:
+            logger.exception("差分フォーマットエラー")
             # エラーが発生した場合は元の差分をそのまま返す
             return diff
 
@@ -270,9 +270,12 @@ class GitDiffProcessor:
             リポジトリの状態辞書
         """
         try:
+            git_cmd = shutil.which('git')
+            if not git_cmd:
+                raise FileNotFoundError("git not found in PATH")
             # ブランチ名を取得
             branch_result = subprocess.run(
-                ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+                [git_cmd, 'rev-parse', '--abbrev-ref', 'HEAD'],
                 capture_output=True,
                 text=True,
                 timeout=10
@@ -281,7 +284,7 @@ class GitDiffProcessor:
 
             # ステージ済み/未ステージファイル数を取得
             status_result = subprocess.run(
-                ['git', 'status', '--porcelain'],
+                [git_cmd, 'status', '--porcelain'],
                 capture_output=True,
                 text=True,
                 timeout=10
@@ -340,7 +343,7 @@ class GitDiffProcessor:
         total_lines = len(diff_content.splitlines())
 
         try:
-            # ファイル変更の検出（diff --git a/file b/file パターン）
+            # ファイル変更の検出(diff --git a/file b/file パターン)
             file_patterns = re.findall(r'^diff --git a/(.+?) b/(.+?)$', diff_content, re.MULTILINE)
             for _old_file, new_file in file_patterns:
                 # /dev/null を除外し、重複をチェック
@@ -352,7 +355,7 @@ class GitDiffProcessor:
             if re.search(r'^\s*GIT binary patch\b', diff_content, re.MULTILINE):
                 is_binary_change = True
 
-            # 追加/削除行数の計算（+/- で始まる行をカウント）
+            # 追加/削除行数の計算(+/- で始まる行をカウント)
             lines = diff_content.splitlines()
             for line in lines:
                 # バイナリファイルの変更を検出
@@ -360,7 +363,7 @@ class GitDiffProcessor:
                     is_binary_change = True
                     continue
 
-                # 差分の内容行のみカウント（ヘッダーやメタデータは除外）
+                # 差分の内容行のみカウント(ヘッダーやメタデータは除外)
                 if line.startswith('+') and not line.startswith('+++'):
                     additions += 1
                 elif line.startswith('-') and not line.startswith('---'):
@@ -368,7 +371,7 @@ class GitDiffProcessor:
 
             # ファイル数が0の場合、他の方法で検出を試行
             if file_count == 0:
-                # --- a/file と +++ b/file パターンも確認（/dev/null を除外）
+                # --- a/file と +++ b/file パターンも確認(/dev/null を除外)
                 alt_old = re.findall(r'^--- a/(.+?)$', diff_content, re.MULTILINE)
                 alt_new = re.findall(r'^\+\+\+ b/(.+?)$', diff_content, re.MULTILINE)
                 files = {p for p in (alt_old + alt_new) if p != '/dev/null'}
@@ -379,7 +382,7 @@ class GitDiffProcessor:
             logger.debug(f"差分解析結果: {file_count}ファイル, {additions}+/{deletions}-, バイナリ: {is_binary_change}")
 
         except Exception as e:
-            logger.warning(f"差分解析中にエラー（処理続行）: {e}")
+            logger.warning(f"差分解析中にエラー(処理続行): {e}")
 
         return DiffData(
             raw_diff=diff_content,
@@ -439,11 +442,13 @@ class GitDiffProcessor:
         if len(diff.encode('utf-8')) <= self.max_diff_size:
             return diff
 
-        # バイト単位で切り詰める
-        truncated = diff.encode('utf-8')[:self.max_diff_size].decode('utf-8', errors='ignore')
-
-        # 最後に改行を追加して切り詰めメッセージを付加
-        return truncated + "\n\n... (diff truncated due to size limit)"
+        # バイト単位で切り詰める（UTF-8/改行境界を優先）
+        buf = diff.encode('utf-8')[:self.max_diff_size]
+        truncated = buf.decode('utf-8', errors='ignore')
+        nl = truncated.rfind('\n')
+        if nl != -1:
+            truncated = truncated[:nl + 1]
+        return truncated + "... (diff truncated due to size limit)\n"
 
     def validate_diff_format(self, diff: str) -> bool:
         """
