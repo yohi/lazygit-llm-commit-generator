@@ -17,7 +17,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 4.1, 4.2_
 
 - [x] 3. Implement Git diff processing
-  - ✅ GitDiffProcessor class実装完了（264行）
+  - ✅ GitDiffProcessor class実装完了
   - ✅ 標準入力からの差分読み取り機能実装完了
   - ✅ ステージされた変更の検証機能実装完了
   - ✅ LLM向け差分フォーマット機能実装完了

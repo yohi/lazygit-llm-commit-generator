@@ -10,6 +10,7 @@ import sys
 import re
 import logging
 import subprocess
+import shutil
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
 from io import StringIO
@@ -70,14 +71,17 @@ class GitDiffProcessor:
         try:
             logger.debug("Git差分を読み取り開始")
 
-            # 標準入力からの読み取りを試行
+            # 標準入力からの読み取りを試行（サイズ上限を考慮）
             diff_content = None
             if not sys.stdin.isatty():
                 try:
-                    diff_content = sys.stdin.read()
+                    raw = sys.stdin.buffer.read(self.max_diff_size + 1)
+                    diff_content = raw.decode('utf-8', errors='ignore')
+                    if len(raw) > self.max_diff_size:
+                        diff_content = self._truncate_diff(diff_content)
                     logger.debug("標準入力からGit差分を読み取り")
-                except:
-                    logger.debug("標準入力からの読み取りに失敗、gitコマンドを使用")
+                except Exception:
+                    logger.exception("標準入力からの読み取りに失敗、gitコマンドを使用")
                     diff_content = None
 
             # 標準入力が利用できない場合はgitコマンドを実行
@@ -85,8 +89,9 @@ class GitDiffProcessor:
                 diff_content = self._read_diff_via_git()
 
             # サイズ制限チェック
-            if len(diff_content.encode('utf-8')) > self.max_diff_size:
-                logger.warning(f"差分サイズが上限を超過: {len(diff_content)} > {self.max_diff_size}")
+            byte_len = len(diff_content.encode('utf-8'))
+            if byte_len > self.max_diff_size:
+                logger.warning(f"差分サイズが上限を超過: {byte_len} > {self.max_diff_size}")
                 # 差分を切り詰める
                 diff_content = self._truncate_diff(diff_content)
 
@@ -99,8 +104,8 @@ class GitDiffProcessor:
             return diff_content
 
         except Exception as e:
-            logger.error(f"Git差分読み取りエラー: {e}")
-            raise GitError(f"差分の読み取りに失敗しました: {e}")
+            logger.exception("Git差分読み取りエラー")
+            raise GitError("差分の読み取りに失敗しました") from e
 
     def _read_diff_via_git(self) -> str:
         """
@@ -113,16 +118,19 @@ class GitDiffProcessor:
             GitError: gitコマンド実行エラー
         """
         try:
+            git_cmd = shutil.which('git')
+            if not git_cmd:
+                raise FileNotFoundError("git not found in PATH")
             result = subprocess.run(
-                ['git', 'diff', '--cached'],
+                [git_cmd, 'diff', '--cached'],
                 capture_output=True,
                 text=True,
                 timeout=30
             )
 
             if result.returncode != 0:
-                error_msg = f"git diff --cached が失敗しました: {result.stderr}"
-                logger.error(error_msg)
+                error_msg = f"git diff --cached が失敗しました (exit={result.returncode}): {result.stderr}"
+                logger.exception(error_msg)
                 raise GitError(error_msg)
 
             diff_output = result.stdout.strip()
@@ -132,11 +140,11 @@ class GitDiffProcessor:
 
         except subprocess.TimeoutExpired as err:
             error_msg = "git diff --cached がタイムアウトしました"
-            logger.error(error_msg)
+            logger.exception(error_msg)
             raise GitError(error_msg) from err
         except FileNotFoundError as err:
             error_msg = "gitコマンドが見つかりません"
-            logger.error(error_msg)
+            logger.exception(error_msg)
             raise GitError(error_msg) from err
 
     def has_staged_changes(self) -> bool:
@@ -149,16 +157,26 @@ class GitDiffProcessor:
             ステージされた変更がある場合True、ない場合False
         """
         try:
+            git_cmd = shutil.which('git')
+            if not git_cmd:
+                raise FileNotFoundError("git not found in PATH")
             result = subprocess.run(
-                ['git', 'diff', '--cached', '--quiet'],
+                [git_cmd, 'diff', '--cached', '--quiet'],
                 capture_output=True,
                 text=True,
                 timeout=10
             )
-            # git diff --quiet は変更がある場合は1、ない場合は0を返す
-            has_changes = result.returncode != 0
-            logger.debug("ステージ済み変更チェック: %s", has_changes)
-            return has_changes
+            # git diff --quiet の終了コードを正確に判定
+            ret = result.returncode
+            if ret == 0:
+                logger.debug("ステージ済み変更チェック: False")
+                return False
+            if ret == 1:
+                logger.debug("ステージ済み変更チェック: True")
+                return True
+            logger.warning("git diff --cached --quiet 非想定終了コード: %d; stderr=%s",
+                           ret, (result.stderr or '').strip())
+            return False
 
         except subprocess.TimeoutExpired:
             logger.exception("git diff --cached --quiet がタイムアウトしました")
@@ -184,6 +202,8 @@ class GitDiffProcessor:
             return "No changes detected"
 
         try:
+            # サイズを強制的に制限
+            diff = self._truncate_diff(diff)
             # 差分を解析
             diff_data = self._parse_diff(diff)
 
@@ -322,11 +342,15 @@ class GitDiffProcessor:
         try:
             # ファイル変更の検出（diff --git a/file b/file パターン）
             file_patterns = re.findall(r'^diff --git a/(.+?) b/(.+?)$', diff_content, re.MULTILINE)
-            for old_file, new_file in file_patterns:
-                file_count += 1
-                # 新しいファイル名を使用（リネームの場合は新しい名前）
-                if new_file not in files_changed:
+            for _old_file, new_file in file_patterns:
+                # /dev/null を除外し、重複をチェック
+                if new_file != '/dev/null' and new_file not in files_changed:
                     files_changed.append(new_file)
+                    file_count += 1
+
+            # GIT binary patch の検出
+            if re.search(r'^\s*GIT binary patch\b', diff_content, re.MULTILINE):
+                is_binary_change = True
 
             # 追加/削除行数の計算（+/- で始まる行をカウント）
             lines = diff_content.splitlines()
@@ -344,11 +368,13 @@ class GitDiffProcessor:
 
             # ファイル数が0の場合、他の方法で検出を試行
             if file_count == 0:
-                # --- a/file +++ b/file パターンも確認
-                alt_file_patterns = re.findall(r'^--- a/(.+?)$', diff_content, re.MULTILINE)
-                if alt_file_patterns:
-                    file_count = len(set(alt_file_patterns))
-                    files_changed = list(set(alt_file_patterns))
+                # --- a/file と +++ b/file パターンも確認（/dev/null を除外）
+                alt_old = re.findall(r'^--- a/(.+?)$', diff_content, re.MULTILINE)
+                alt_new = re.findall(r'^\+\+\+ b/(.+?)$', diff_content, re.MULTILINE)
+                files = {p for p in (alt_old + alt_new) if p != '/dev/null'}
+                if files:
+                    file_count = len(files)
+                    files_changed = list(files)
 
             logger.debug(f"差分解析結果: {file_count}ファイル, {additions}+/{deletions}-, バイナリ: {is_binary_change}")
 
@@ -435,7 +461,6 @@ class GitDiffProcessor:
         # 基本的なGit差分フォーマットの存在確認
         has_diff_header = 'diff --git' in diff
         has_file_header = ('---' in diff and '+++' in diff)
-        has_changes = ('+' in diff or '-' in diff)
 
-        # 最低限の条件: ファイルヘッダーまたは変更内容が存在
-        return has_file_header or has_changes or has_diff_header
+        # 最低限の条件: diffヘッダーまたはファイルヘッダーが存在
+        return has_file_header or has_diff_header
