@@ -26,7 +26,7 @@
   - _Requirements: 1.1, 1.4_
 
 - [x] 4. Create provider factory and base classes
-  - ✅ ProviderFactory class実装完了（328行）
+  - ✅ ProviderFactory class実装完了（133行）
   - ✅ ProviderRegistry動的登録システム実装完了
   - ✅ API/CLI型プロバイダーの自動判別機能実装完了
   - ✅ 設定ベースのプロバイダーインスタンス化実装完了
@@ -98,7 +98,7 @@
   - _Requirements: 7.1, 7.3, 6.1, 6.4_
 
 - [x] 10. Create message formatting and output handling
-  - ✅ MessageFormatter class実装完了（247行）
+  - ✅ MessageFormatter class実装完了（172行）
   - ✅ LLMレスポンスのクリーニング機能実装完了
   - ✅ LazyGit互換の出力フォーマット機能実装完了
   - ✅ メッセージ長とコンテンツ検証機能実装完了

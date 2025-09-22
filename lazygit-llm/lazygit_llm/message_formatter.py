@@ -90,21 +90,20 @@ class MessageFormatter:
         # マークダウンのコードブロックを除去
         message = re.sub(r'```[\s\S]*?```', '', message)
 
-        # 説明的なテキストを除去
-        prefixes_to_remove = [
-            'commit message:',
-            'git commit -m',
-            'suggested commit message:',
-            'here is the commit message:',
-            'commit:',
-        ]
+        # 代表的な前置き文言を包括的に除去（英日・表記ゆれ対応）
+        prefix_pattern = re.compile(
+            r'^\s*(?:'
+            r'git\s+commit\s+-m|'
+            r'(?:suggested\s+)?commit(?:\s+message)?\s*[:\-]?|'
+            r'(?:here\s+is\s+the\s+)?commit\s+message\s*[:\-]?|'
+            r'コミット(?:メッセージ)?\s*[:\-]?'
+            r')\s*',
+            re.IGNORECASE,
+        )
+        message = prefix_pattern.sub('', message, count=1)
 
-        for prefix in prefixes_to_remove:
-            pattern = re.compile(rf'^{re.escape(prefix)}\s*', re.IGNORECASE)
-            message = pattern.sub('', message)
-
-        # 引用符を除去
-        message = message.strip().strip('"').strip("'").strip('`')
+        # 引用符（ASCII/Unicode）を除去
+        message = message.strip().strip('"\u201C\u201D\'\u2018\u2019`')
 
         # 最初の行を取得(複数行の場合)
         first_line = message.split('\n')[0].strip()
@@ -132,8 +131,10 @@ class MessageFormatter:
         if len(message) <= self.max_length:
             return message
 
-        # 省略記号分を確保
-        limit = max(0, self.max_length - 3)
+        # 省略記号分を確保（上限3未満はそのまま切り取り）
+        if self.max_length <= 3:
+            return message[:self.max_length]
+        limit = self.max_length - 3
         truncated = message[:limit]
         last_space = truncated.rfind(' ')
 
@@ -163,6 +164,10 @@ class MessageFormatter:
 
         # 最小長チェック
         if len(message.strip()) < 3:
+            return False
+
+        # 最大長チェック（任意）
+        if len(message) > self.max_length:
             return False
 
         # 不正な文字のチェック(制御文字)
