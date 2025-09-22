@@ -44,6 +44,11 @@ class MessageFormatter:
         # コミットメッセージの抽出
         commit_message = self._extract_commit_message(cleaned)
 
+        # 抽出後に空の場合はデフォルトへフォールバック
+        if not commit_message or not commit_message.strip():
+            logger.warning("抽出後のメッセージが空のためデフォルトにフォールバックします")
+            return self.default_message
+
         # 長さ制限の適用
         final_message = self._apply_length_limit(commit_message)
 
@@ -94,7 +99,8 @@ class MessageFormatter:
         prefix_pattern = re.compile(
             r'^\s*(?:'
             r'git\s+commit\s+-m|'
-            r'(?:suggested\s+)?commit(?:\s+message)?\s*[:\-]?|'
+            r'(?:suggested\s+)?commit\s+(?:message|messages|msg)\s*[:\-]?|'
+            r'commit\s*[:\-]|'
             r'(?:here\s+is\s+the\s+)?commit\s+message\s*[:\-]?|'
             r'コミット(?:メッセージ)?\s*[:\-]?'
             r')\s*',
@@ -102,8 +108,8 @@ class MessageFormatter:
         )
         message = prefix_pattern.sub('', message, count=1)
 
-        # 引用符（ASCII/Unicode）を除去
-        message = message.strip().strip('"\u201C\u201D\'\u2018\u2019`')
+        # 引用符（ASCII/Unicode/日本語）を除去
+        message = message.strip().strip('"\u201C\u201D\'\u2018\u2019`\u300C\u300D\u300E\u300F')
 
         # 最初の行を取得(複数行の場合)
         first_line = message.split('\n')[0].strip()
