@@ -1,0 +1,49 @@
+# LazyGit LLM Commit Message Generator - 設定ファイル例
+# このファイルをconfig.ymlにコピーして使用してください
+
+# LLMプロバイダーの設定 (openai, anthropic, gemini-api, gemini-cli, claude-code)
+provider: "openai"
+
+# モデル名（プロバイダーごとに異なる）
+model_name: "gpt-4"
+
+# APIキー（環境変数参照を推奨）
+# 実際の使用時は環境変数 ${OPENAI_API_KEY} などを使用
+api_key: "${OPENAI_API_KEY}"
+
+# プロンプトテンプレート
+# $diff は実際のgit diffに置換されます
+prompt_template: |
+  Based on the following git diff, generate a concise commit message that follows conventional commits format:
+
+  $diff
+
+  Generate only the commit message, no additional text.
+
+# タイムアウト設定（秒）
+timeout: 30
+
+# 最大トークン数
+max_tokens: 100
+
+# プロバイダー固有の追加設定例
+additional_params:
+  # OpenAI固有
+  temperature: 0.3
+  top_p: 1.0
+
+  # Anthropic固有
+  # max_tokens_to_sample: 100
+
+  # Gemini固有
+  # safety_settings:
+  #   - category: "HARM_CATEGORY_DANGEROUS_CONTENT"
+  #     threshold: "BLOCK_MEDIUM_AND_ABOVE"
+
+# 日本語コミットメッセージ用のプロンプト例（コメントアウト）
+# prompt_template: |
+#   以下のgit diffに基づいて、簡潔で分かりやすいコミットメッセージを日本語で生成してください：
+#
+#   $diff
+#
+#   コミットメッセージのみを出力してください。

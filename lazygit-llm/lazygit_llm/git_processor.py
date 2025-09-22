@@ -1,0 +1,136 @@
+"""
+Git差分処理モジュール
+
+ステージ済みの変更を取得・処理する。
+"""
+
+import subprocess
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class GitDiffProcessor:
+    """Git差分処理クラス"""
+    
+    def has_staged_changes(self) -> bool:
+        """
+        ステージ済みの変更があるかチェックする
+        
+        Returns:
+            ステージ済みの変更がある場合True
+        """
+        try:
+            result = subprocess.run(
+                ['git', 'diff', '--cached', '--quiet'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            # git diff --quiet は変更がある場合は1、ない場合は0を返す
+            has_changes = result.returncode != 0
+            logger.debug("ステージ済み変更チェック: %s", has_changes)
+            return has_changes
+            
+        except subprocess.TimeoutExpired:
+            logger.exception("git diff --cached --quiet がタイムアウトしました")
+            return False
+        except FileNotFoundError:
+            logger.exception("gitコマンドが見つかりません")
+            return False
+        except Exception:
+            logger.exception("ステージ済み変更のチェックに失敗")
+            return False
+    
+    def read_staged_diff(self) -> str:
+        """
+        ステージ済みの差分を取得する
+        
+        Returns:
+            Git差分の文字列
+            
+        Raises:
+            subprocess.SubprocessError: gitコマンド実行エラー
+        """
+        try:
+            result = subprocess.run(
+                ['git', 'diff', '--cached'],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode != 0:
+                error_msg = f"git diff --cached が失敗しました: {result.stderr}"
+                logger.error(error_msg)
+                raise subprocess.SubprocessError(error_msg)
+            
+            diff_output = result.stdout.strip()
+            logger.debug("Git差分を取得しました (%d文字)", len(diff_output))
+            
+            return diff_output
+            
+        except subprocess.TimeoutExpired as err:
+            error_msg = "git diff --cached がタイムアウトしました"
+            logger.error(error_msg)
+            raise subprocess.SubprocessError(error_msg) from err
+        except FileNotFoundError as err:
+            error_msg = "gitコマンドが見つかりません"
+            logger.error(error_msg)
+            raise subprocess.SubprocessError(error_msg) from err
+    
+    def get_repository_status(self) -> dict:
+        """
+        リポジトリの状態を取得する
+        
+        Returns:
+            リポジトリの状態辞書
+        """
+        try:
+            # ブランチ名を取得
+            branch_result = subprocess.run(
+                ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            current_branch = branch_result.stdout.strip() if branch_result.returncode == 0 else "unknown"
+            
+            # ステージ済み/未ステージファイル数を取得
+            status_result = subprocess.run(
+                ['git', 'status', '--porcelain'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            staged_files = 0
+            unstaged_files = 0
+            
+            if status_result.returncode == 0:
+                for line in status_result.stdout.splitlines():
+                    if not line or len(line) < 2:
+                        continue
+                    # 無視ファイルは "!!" で始まる
+                    if line.startswith('!!'):
+                        continue
+                    staged_char = line[0]
+                    unstaged_char = line[1]
+                    if staged_char not in (' ', '?'):
+                        staged_files += 1
+                    if unstaged_char != ' ':
+                        unstaged_files += 1
+            
+            return {
+                'current_branch': current_branch,
+                'staged_files': staged_files,
+                'unstaged_files': unstaged_files
+            }
+            
+        except Exception:
+            logger.exception("リポジトリ状態の取得に失敗")
+            return {
+                'current_branch': "unknown",
+                'staged_files': 0,
+                'unstaged_files': 0
+            }
