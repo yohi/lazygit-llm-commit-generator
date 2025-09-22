@@ -10,7 +10,7 @@ anthropic>=0.7.0
 google-generativeai>=0.3.0
 
 # CLI実行用
-subprocess32>=3.5.4; python_version < "3.0"
+
 
 # 開発・テスト用依存関係（本番では不要）
 pytest>=7.4.0
