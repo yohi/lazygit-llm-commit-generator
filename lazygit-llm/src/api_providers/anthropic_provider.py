@@ -63,9 +63,9 @@ class AnthropicProvider(BaseProvider):
             self.client = Anthropic(api_key=self.api_key)
             logger.info(f"Anthropicプロバイダーを初期化: model={self.model}")
         except Exception as e:
-            raise ProviderError(f"Anthropicクライアントの初期化に失敗: {e}")
+            raise ProviderError(f"Anthropicクライアントの初期化に失敗: {e}") from e
 
-        # 追加設定（Claudeは max_tokens_to_sample を使用）
+        # 追加設定(Claudeは max_tokens_to_sample を使用)
         additional_params = config.get('additional_params', {})
         self.max_tokens_to_sample = additional_params.get('max_tokens_to_sample', self.max_tokens)
         self.temperature = additional_params.get('temperature', 0.3)
@@ -185,7 +185,7 @@ class AnthropicProvider(BaseProvider):
 
     def _make_api_request(self, prompt: str) -> str:
         """
-        Anthropic APIリクエストを実行（リトライ機能付き）
+        Anthropic APIリクエストを実行(リトライ機能付き)
 
         Args:
             prompt: 送信するプロンプト
@@ -243,7 +243,7 @@ class AnthropicProvider(BaseProvider):
             サポートされているモデル名のリスト
         """
         return [
-            # 最新モデル（2025年リリース）
+            # 最新モデル(2025年リリース)
             'claude-opus-4-1-20250805',
             'claude-opus-4-20250514',
             'claude-sonnet-4-20250514',
@@ -305,7 +305,7 @@ Commit message:"""
 
     def generate_commit_message(self, diff: str, prompt_template: str) -> str:
         """
-        Git差分からコミットメッセージを生成（Claude最適化版）
+        Git差分からコミットメッセージを生成(Claude最適化版)
 
         Args:
             diff: Git差分
@@ -372,4 +372,4 @@ Commit message:"""
             raise ResponseError("Anthropic APIから空のレスポンスを受信しました")
 
         except Exception as e:
-            raise ProviderError(f"Anthropic APIリクエストに失敗: {e}")
+            raise ProviderError(f"Anthropic APIリクエストに失敗: {e}") from e

@@ -124,16 +124,16 @@ class GeminiAPIProvider(BaseProvider):
             return response
 
         except Exception as e:
-            logger.error(f"Gemini API呼び出し中にエラー: {e}")
+            logger.exception("Gemini API呼び出し中にエラー")
             # Gemini固有のエラーハンドリング
             if "API_KEY_INVALID" in str(e) or "authentication" in str(e).lower():
-                raise AuthenticationError(f"Gemini API認証に失敗しました: {e}")
+                raise AuthenticationError(f"Gemini API認証に失敗しました: {e}") from e
             elif "quota" in str(e).lower() or "rate" in str(e).lower():
-                raise ProviderError(f"Gemini APIクォータまたはレート制限に達しました: {e}")
+                raise ProviderError(f"Gemini APIクォータまたはレート制限に達しました: {e}") from e
             elif "timeout" in str(e).lower():
-                raise TimeoutError(f"Gemini APIがタイムアウトしました: {e}")
+                raise TimeoutError(f"Gemini APIがタイムアウトしました: {e}") from e
             else:
-                raise ProviderError(f"Gemini API呼び出しに失敗しました: {e}")
+                raise ProviderError(f"Gemini API呼び出しに失敗しました: {e}") from e
 
     def test_connection(self) -> bool:
         """
@@ -169,11 +169,11 @@ class GeminiAPIProvider(BaseProvider):
                 return False
 
         except Exception as e:
-            logger.error(f"Gemini API接続テストエラー: {e}")
+            logger.exception("Gemini API接続テストエラー")
             if "API_KEY_INVALID" in str(e) or "authentication" in str(e).lower():
-                raise AuthenticationError(f"Gemini API認証に失敗しました: {e}")
+                raise AuthenticationError(f"Gemini API認証に失敗しました: {e}") from e
             else:
-                raise ProviderError(f"Gemini API接続テストに失敗しました: {e}")
+                raise ProviderError(f"Gemini API接続テストに失敗しました: {e}") from e
 
     def supports_streaming(self) -> bool:
         """
@@ -206,6 +206,7 @@ class GeminiAPIProvider(BaseProvider):
         prompt = self._format_prompt(diff, prompt_template)
         logger.debug(f"Gemini APIストリーミングリクエスト: model={self.model_name}")
 
+        stream = None
         try:
             # ストリーミングAPI呼び出し
             stream = self.model.generate_content(
@@ -224,15 +225,32 @@ class GeminiAPIProvider(BaseProvider):
                     yield content
 
             # 最終的なレスポンス検証
+            if not accumulated_content.strip():
+                raise ProviderError("Gemini APIから空のレスポンスを受信しました")
+
             if not self._validate_response(accumulated_content):
                 logger.warning("ストリーミングレスポンスの検証に失敗")
 
+        except (GeneratorExit, KeyboardInterrupt):
+            # 中断シグナルは即座に再発生
+            raise
         except Exception as e:
-            logger.error(f"Geminiストリーミングエラー: {e}")
+            logger.exception("Geminiストリーミングエラー")
             if "API_KEY_INVALID" in str(e) or "authentication" in str(e).lower():
-                raise AuthenticationError(f"Gemini API認証に失敗しました: {e}")
+                raise AuthenticationError(f"Gemini API認証に失敗しました: {e}") from e
+            elif "quota" in str(e).lower() or "rate" in str(e).lower():
+                raise ProviderError(f"Gemini APIクォータまたはレート制限に達しました: {e}") from e
+            elif "timeout" in str(e).lower():
+                raise TimeoutError(f"Gemini APIがタイムアウトしました: {e}") from e
             else:
-                raise ProviderError(f"Geminiストリーミングに失敗しました: {e}")
+                raise ProviderError(f"Geminiストリーミングに失敗しました: {e}") from e
+        finally:
+            # ストリームリソースの清理
+            if stream and hasattr(stream, 'close'):
+                try:
+                    stream.close()
+                except Exception:
+                    pass  # 清理エラーは無視
 
     def get_required_config_fields(self) -> list[str]:
         """
@@ -362,11 +380,11 @@ class GeminiAPIProvider(BaseProvider):
             サポートされているモデル名のリスト
         """
         return [
-            # 最新GA版（2025年）
+            # 最新GA版(2025年)
             'gemini-2.5-pro',
             'gemini-2.5-flash',
             'gemini-2.5-flash-lite',  # プレビュー版
-            # 既存モデル（フォールバック）
+            # 既存モデル(フォールバック)
             'gemini-1.5-pro',
             'gemini-1.5-flash',
             'gemini-1.0-pro',
