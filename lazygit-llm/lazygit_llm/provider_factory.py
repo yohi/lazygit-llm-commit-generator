@@ -78,8 +78,9 @@ class ProviderFactory:
                         f"利用可能なAPIプロバイダー: {', '.join(available_api)}\n"
                         f"利用可能なCLIプロバイダー: {', '.join(available_cli)}{hint}"
                     )
-        else:
-            # type 明示時の既存処理
+
+        # provider_type が決定された場合のクラス解決（明示指定または自動判別）
+        if provider_type and not provider_class:
             if provider_type == 'api':
                 provider_class = get_api_provider_class(provider_name)
             elif provider_type == 'cli':

@@ -20,7 +20,13 @@ class MessageFormatter:
         Args:
             max_length: 最大メッセージ長
             default_message: 空入力の場合のデフォルトメッセージ
+
+        Raises:
+            ValueError: max_lengthが無効な値の場合
         """
+        if not isinstance(max_length, int) or max_length < 1:
+            raise ValueError("max_length must be an integer >= 1")
+
         self.max_length = max_length
         self.default_message = default_message
 
@@ -36,7 +42,7 @@ class MessageFormatter:
         """
         if not raw_message or not raw_message.strip():
             logger.warning("空のメッセージを受信しました")
-            return self.default_message
+            return self._apply_length_limit(self.default_message)
 
         # 基本的なクリーニング
         cleaned = self._clean_message(raw_message)
@@ -47,7 +53,7 @@ class MessageFormatter:
         # 抽出後に空の場合はデフォルトへフォールバック
         if not commit_message or not commit_message.strip():
             logger.warning("抽出後のメッセージが空のためデフォルトにフォールバックします")
-            return self.default_message
+            return self._apply_length_limit(self.default_message)
 
         # 長さ制限の適用
         final_message = self._apply_length_limit(commit_message)
@@ -99,10 +105,10 @@ class MessageFormatter:
         prefix_pattern = re.compile(
             r'^\s*(?:'
             r'git\s+commit\s+-m|'
-            r'(?:suggested\s+)?commit\s+(?:message|messages|msg)\s*[:\-]?|'
+            r'(?:suggested\s+)?commit\s+(?:message|messages|msg)\s*[:\-]|'
             r'commit\s*[:\-]|'
-            r'(?:here\s+is\s+the\s+)?commit\s+message\s*[:\-]?|'
-            r'コミット(?:メッセージ)?\s*[:\-]?'
+            r'(?:here\s+is\s+the\s+)?commit\s+message\s*[:\-]|'
+            r'コミット(?:メッセージ)?\s*[:\-]'
             r')\s*',
             re.IGNORECASE,
         )
