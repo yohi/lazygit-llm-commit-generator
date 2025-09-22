@@ -1,38 +1,33 @@
-#!/usr/bin/env python3
 """
 LazyGit LLM Commit Message Generator - メインエントリーポイント
 
 LazyGitのカスタムコマンドから呼び出される主要スクリプト。
-標準入力からGit差分を受け取り、LLMを使用してコミットメッセージを生成する。
+ステージ済みのGit差分を内部コマンドで取得し、LLMでコミットメッセージを生成する。
 
 使用方法:
-    git diff --staged | python main.py
+    lazygit-llm-generate
 
 LazyGit設定例:
     customCommands:
       - key: '<c-g>'
-        command: 'git diff --staged | python3 /path/to/main.py'
+        command: 'lazygit-llm-generate'
         context: 'files'
         description: 'Generate commit message with LLM'
         stream: true
 """
 
 import sys
+import os
 import argparse
 import logging
+import tempfile
 from pathlib import Path
-from typing import Optional
 
-# プロジェクトルートをPATHに追加
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-
-from src.config_manager import ConfigManager
-from src.git_processor import GitDiffProcessor
-from src.provider_factory import ProviderFactory
-from src.message_formatter import MessageFormatter
-from src.base_provider import ProviderError, AuthenticationError, TimeoutError
-
+from lazygit_llm.config_manager import ConfigManager
+from lazygit_llm.git_processor import GitDiffProcessor
+from lazygit_llm.provider_factory import ProviderFactory
+from lazygit_llm.message_formatter import MessageFormatter
+from lazygit_llm.base_provider import ProviderError, AuthenticationError, ProviderTimeoutError
 
 def setup_logging(verbose: bool = False) -> None:
     """
@@ -42,13 +37,21 @@ def setup_logging(verbose: bool = False) -> None:
         verbose: 詳細ログを有効にする場合True
     """
     level = logging.DEBUG if verbose else logging.INFO
+    # セキュリティを考慮して一意な名前のログファイルを作成
+    log_fd, log_file_path = tempfile.mkstemp(prefix='lazygit-llm-', suffix='.log', text=True)
+    os.close(log_fd)  # ファイルディスクリプタを閉じる
+    log_file = Path(log_file_path)
+    
+    if verbose:
+        print(f"ログファイル: {log_file}", file=sys.stderr)
+
+    handlers = [logging.FileHandler(str(log_file), encoding='utf-8')]
+    if verbose:
+        handlers.append(logging.StreamHandler(sys.stderr))
     logging.basicConfig(
         level=level,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler('/tmp/lazygit-llm.log'),
-            logging.StreamHandler(sys.stderr) if verbose else logging.NullHandler()
-        ]
+        handlers=handlers,
     )
 
 
@@ -122,8 +125,8 @@ def test_configuration(config_manager: ConfigManager) -> bool:
             print("❌ プロバイダーへの接続に失敗しました")
             return False
 
-    except Exception as e:
-        logger.error(f"設定テスト中にエラー: {e}")
+    except (ProviderError, AuthenticationError, ProviderTimeoutError) as e:
+        logger.exception("設定テスト中にエラー")
         print(f"❌ 設定テストエラー: {e}")
         return False
 
@@ -156,11 +159,10 @@ def main() -> int:
 
         # Git差分を処理
         git_processor = GitDiffProcessor()
-        diff_data = git_processor.read_staged_diff()
-
         if not git_processor.has_staged_changes():
-            print("No staged files found")
+            print("ステージ済みの変更が見つかりません")
             return 0
+        diff_data = git_processor.read_staged_diff()
 
         # LLMプロバイダーを作成
         provider_factory = ProviderFactory()
@@ -177,28 +179,31 @@ def main() -> int:
         # LazyGitに出力
         print(formatted_message)
 
-        logger.info("コミットメッセージ生成完了")
-        return 0
-
-    except AuthenticationError as e:
-        logger.error(f"認証エラー: {e}")
-        print(f"❌ 認証エラー: APIキーを確認してください")
+    except AuthenticationError:
+        logger.exception("認証エラー")
+        print("❌ 認証エラー: APIキーを確認してください")
         return 1
 
-    except TimeoutError as e:
-        logger.error(f"タイムアウトエラー: {e}")
-        print(f"❌ タイムアウト: ネットワーク接続を確認してください")
+    except ProviderTimeoutError:
+        logger.exception("タイムアウトエラー")
+        print("❌ タイムアウト: ネットワーク接続を確認してください")
         return 1
 
     except ProviderError as e:
-        logger.error(f"プロバイダーエラー: {e}")
+        logger.exception("プロバイダーエラー")
         print(f"❌ プロバイダーエラー: {e}")
         return 1
 
+    except KeyboardInterrupt:
+        print("⛔ 操作が中断されました")
+        return 130
     except Exception as e:
-        logger.error(f"予期しないエラー: {e}")
+        logger.exception("予期しないエラー")
         print(f"❌ エラー: {e}")
         return 1
+    else:
+        logger.info("コミットメッセージ生成完了")
+        return 0
 
 
 if __name__ == "__main__":
