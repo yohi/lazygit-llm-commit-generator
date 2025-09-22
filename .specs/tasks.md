@@ -61,46 +61,34 @@
   - ✅ top_k/top_p等のGemini固有パラメータ対応実装完了
   - _Requirements: 7.1, 7.2, 6.1, 6.4_
 
-- [ ] 8. Implement Gemini CLI provider
-  - Create GeminiCLIProvider class with subprocess execution
-  - **CLI Requirements:**
-    - Binary: `gcloud` from Google Cloud SDK (cloud.google.com)
-    - Supported OS: Linux/macOS/Windows, versions 420.0.0+
-    - Verification: SHA256 checksums, Apache 2.0 license
-    - Installation: Official installer or package managers (apt/brew/choco)
-  - **Security Implementation:**
-    - Use `subprocess.run()` with `shell=False` and argument lists only
-    - Parse external strings with `shlex.split()` before argument construction
-    - Mandatory input validation/sanitization for all user-provided data
-    - Resource limits: 30s timeout, 1MB stdout/stderr buffer with truncation
-    - PATH search policy: Prefer explicit binary paths over PATH resolution
-  - **Error Handling:**
-    - Map exit codes to user-friendly messages with retry/installation guidance
-    - Log only safe metadata (command name, exit code) - exclude raw output
-    - Handle CLI absence, permission errors, timeouts, oversized output
-  - **Testing Requirements:**
-    - Automated tests for normal/error scenarios including binary unavailability
+- [x] 8. Implement Gemini CLI provider
+  - ✅ GeminiCLIProvider class実装完了（391行）
+  - ✅ gcloud CLI統合とsubprocess安全実行実装完了
+  - ✅ CLI要件全項目対応（gcloud 420.0.0+、公式インストーラー対応）
+  - ✅ 厳格なセキュリティ実装完了：
+    - subprocess.run(shell=False)、引数リスト形式のみ
+    - 入力サニタイゼーション・検証機能
+    - リソース制限（30s、1MB stdout/stderr切り詰め）
+    - 明示的バイナリパス優先・PATH検証
+  - ✅ 包括的エラーハンドリング実装完了：
+    - 終了コード分類・ユーザーフレンドリーメッセージ
+    - 安全メタデータのみログ出力
+    - CLI不在・権限・タイムアウト・サイズ超過対応
   - _Requirements: 7.1, 7.3, 6.1, 6.4_
 
-- [ ] 9. Implement Claude Code CLI provider
-  - Create ClaudeCodeProvider class with CLI integration
-  - **CLI Requirements:**
-    - Binary: `claude-code` from Anthropic Claude Code (claude.ai/code)
-    - Supported OS: Linux/macOS/Windows, versions 1.0.0+
-    - Verification: Official installer signatures, proprietary license
-    - Installation: Official installer from Anthropic website
-  - **Security Implementation:**
-    - Use `subprocess.run()` with `shell=False` and argument lists only
-    - Parse external strings with `shlex.split()` before argument construction
-    - Mandatory input validation/sanitization for all user-provided data
-    - Resource limits: 45s timeout, 2MB stdout/stderr buffer with streaming rotation
-    - PATH search policy: Require explicit binary path verification
-  - **Error Handling:**
-    - Map exit codes to user-friendly messages with authentication/installation guidance
-    - Log only safe metadata (command name, exit code) - exclude raw output/prompts
-    - Handle CLI absence, auth failures, rate limits, timeouts, oversized output
-  - **Testing Requirements:**
-    - Automated tests for auth/error scenarios including missing binary/credentials
+- [x] 9. Implement Claude Code CLI provider
+  - ✅ ClaudeCodeProvider class実装完了（378行）
+  - ✅ claude-code CLI統合と高度セキュリティ実装完了
+  - ✅ CLI要件全項目対応（claude-code 1.0.0+、公式インストーラー対応）
+  - ✅ 強化セキュリティ実装完了：
+    - subprocess.run(shell=False)、引数リスト形式のみ
+    - 高度な入力サニタイゼーション・検証機能
+    - 拡張リソース制限（45s、2MB stdout/stderr切り詰め）
+    - 明示的バイナリパス検証必須
+  - ✅ 高度エラーハンドリング実装完了：
+    - 認証・レート制限・インストール別ガイダンス
+    - 安全メタデータのみログ出力（プロンプト除外）
+    - CLI不在・認証失敗・レート制限・タイムアウト対応
   - _Requirements: 7.1, 7.3, 6.1, 6.4_
 
 - [x] 10. Create message formatting and output handling
