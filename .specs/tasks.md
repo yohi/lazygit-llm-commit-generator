@@ -25,11 +25,13 @@
   - ✅ DiffDataクラスによる構造化解析実装完了
   - _Requirements: 1.1, 1.4_
 
-- [ ] 4. Create provider factory and base classes
-  - Implement ProviderFactory with provider type detection
-  - Create BaseProvider abstract class with common interface
-  - Add provider registration and instantiation logic
-  - Implement connection testing interface for all providers
+- [x] 4. Create provider factory and base classes
+  - ✅ ProviderFactory class実装完了（133行）
+  - ✅ ProviderRegistry動的登録システム実装完了
+  - ✅ API/CLI型プロバイダーの自動判別機能実装完了
+  - ✅ 設定ベースのプロバイダーインスタンス化実装完了
+  - ✅ 接続テストインターフェース実装完了
+  - ✅ BaseProvider abstract class（既に実装済み）
   - _Requirements: 7.1, 7.4_
 
 - [ ] 5. Implement OpenAI API provider
@@ -95,11 +97,12 @@
     - Automated tests for auth/error scenarios including missing binary/credentials
   - _Requirements: 7.1, 7.3, 6.1, 6.4_
 
-- [ ] 10. Create message formatting and output handling
-  - Implement MessageFormatter class for response cleaning
-  - Add output validation and format standardization
-  - Create LazyGit-compatible output formatting
-  - Implement message length and content validation
+- [x] 10. Create message formatting and output handling
+  - ✅ MessageFormatter class実装完了（172行）
+  - ✅ LLMレスポンスのクリーニング機能実装完了
+  - ✅ LazyGit互換の出力フォーマット機能実装完了
+  - ✅ メッセージ長とコンテンツ検証機能実装完了
+  - ✅ LLMアーティファクト除去機能実装完了
   - _Requirements: 1.2, 3.1, 3.2_
 
 - [ ] 11. Implement comprehensive error handling
