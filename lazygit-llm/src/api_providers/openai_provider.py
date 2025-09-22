@@ -7,7 +7,8 @@ GPT-4、GPT-3.5-turbo等のモデルに対応し、ストリーミング出力�
 
 import logging
 import time
-from typing import Dict, Any, Optional, Iterator
+import random
+from typing import Dict, Any, Iterator
 
 try:
     import openai
@@ -44,8 +45,8 @@ class OpenAIProvider(BaseProvider):
 
         if not OPENAI_AVAILABLE:
             raise ProviderError(
-                "OpenAIライブラリがインストールされていません。"
-                "pip install openai を実行してください。"
+                "OpenAI Python SDK v1+ が必要です。"
+                "pip install -U openai で v1 以上をインストールしてください。"
             )
 
         # 設定の検証
@@ -60,15 +61,33 @@ class OpenAIProvider(BaseProvider):
             raise AuthenticationError("OpenAI APIキーが設定されていません")
 
         try:
-            self.client = OpenAI(api_key=self.api_key)
-            logger.info(f"OpenAIプロバイダーを初期化: model={self.model}")
+            # 追加: 互換エンドポイント用 base_url
+            self.base_url = config.get('additional_params', {}).get('base_url')
+            if self.base_url:
+                self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+                logger.info(f"OpenAIプロバイダーを初期化: model={self.model}, base_url={self.base_url}")
+            else:
+                self.client = OpenAI(api_key=self.api_key)
+                logger.info(f"OpenAIプロバイダーを初期化: model={self.model}")
         except Exception as e:
-            raise ProviderError(f"OpenAIクライアントの初期化に失敗: {e}")
+            raise ProviderError(f"OpenAIクライアントの初期化に失敗: {e}") from e
 
         # 追加設定
         self.temperature = config.get('additional_params', {}).get('temperature', 0.3)
         self.top_p = config.get('additional_params', {}).get('top_p', 1.0)
         self.max_retries = config.get('additional_params', {}).get('max_retries', 3)
+        self.timeout = config.get('additional_params', {}).get('timeout', 30)
+        self.max_tokens = config.get('additional_params', {}).get('max_tokens', 500)
+
+        # 値の簡易バリデーション
+        try:
+            self.temperature = max(0.0, min(2.0, float(self.temperature)))
+            self.top_p = max(0.0, min(1.0, float(self.top_p)))
+            self.max_retries = max(0, int(self.max_retries))
+            self.max_tokens = max(1, int(self.max_tokens))
+            self.timeout = max(1, int(self.timeout))
+        except (TypeError, ValueError) as e:
+            raise ProviderError(f"additional_params の値が不正です: {e}") from e
 
     def generate_commit_message(self, diff: str, prompt_template: str) -> str:
         """
@@ -109,24 +128,24 @@ class OpenAIProvider(BaseProvider):
             return response
 
         except openai.AuthenticationError as e:
-            logger.error(f"OpenAI認証エラー: {e}")
-            raise AuthenticationError(f"OpenAI API認証に失敗しました: {e}")
+            logger.exception("OpenAI認証エラー")
+            raise AuthenticationError(f"OpenAI API認証に失敗しました: {e}") from e
 
         except openai.RateLimitError as e:
-            logger.error(f"OpenAI APIレート制限エラー: {e}")
-            raise ProviderError(f"OpenAI APIレート制限に達しました: {e}")
+            logger.exception("OpenAI APIレート制限エラー")
+            raise ProviderError(f"OpenAI APIレート制限に達しました: {e}") from e
 
         except openai.APITimeoutError as e:
-            logger.error(f"OpenAI APIタイムアウト: {e}")
-            raise TimeoutError(f"OpenAI APIがタイムアウトしました: {e}")
+            logger.exception("OpenAI APIタイムアウト")
+            raise TimeoutError(f"OpenAI APIがタイムアウトしました: {e}") from e
 
         except openai.APIError as e:
-            logger.error(f"OpenAI APIエラー: {e}")
-            raise ProviderError(f"OpenAI APIエラー: {e}")
+            logger.exception("OpenAI APIエラー")
+            raise ProviderError(f"OpenAI APIエラー: {e}") from e
 
         except Exception as e:
-            logger.error(f"OpenAI API呼び出し中に予期しないエラー: {e}")
-            raise ProviderError(f"OpenAI API呼び出しに失敗しました: {e}")
+            logger.exception("OpenAI API呼び出し中に予期しないエラー")
+            raise ProviderError(f"OpenAI API呼び出しに失敗しました: {e}") from e
 
     def test_connection(self) -> bool:
         """
@@ -148,8 +167,8 @@ class OpenAIProvider(BaseProvider):
                 messages=[
                     {"role": "user", "content": "Hello, this is a connection test."}
                 ],
-                max_tokens=5,
-                timeout=10
+                max_tokens=min(5, self.max_tokens),
+                timeout=self.timeout
             )
 
             if test_response and test_response.choices:
@@ -160,12 +179,12 @@ class OpenAIProvider(BaseProvider):
                 return False
 
         except openai.AuthenticationError as e:
-            logger.error(f"OpenAI認証エラー: {e}")
-            raise AuthenticationError(f"OpenAI API認証に失敗しました: {e}")
+            logger.exception("OpenAI認証エラー")
+            raise AuthenticationError(f"OpenAI API認証に失敗しました: {e}") from e
 
         except Exception as e:
-            logger.error(f"OpenAI API接続テストエラー: {e}")
-            raise ProviderError(f"OpenAI API接続テストに失敗しました: {e}")
+            logger.exception("OpenAI API接続テストエラー")
+            raise ProviderError(f"OpenAI API接続テストに失敗しました: {e}") from e
 
     def supports_streaming(self) -> bool:
         """
@@ -225,12 +244,20 @@ class OpenAIProvider(BaseProvider):
                 logger.warning("ストリーミングレスポンスの検証に失敗")
 
         except openai.AuthenticationError as e:
-            logger.error(f"OpenAIストリーミング認証エラー: {e}")
-            raise AuthenticationError(f"OpenAI API認証に失敗しました: {e}")
+            logger.exception("OpenAIストリーミング認証エラー")
+            raise AuthenticationError(f"OpenAI API認証に失敗しました: {e}") from e
+
+        except openai.RateLimitError as e:
+            logger.exception("OpenAI APIレート制限エラー(ストリーミング)")
+            raise ProviderError(f"OpenAI APIレート制限に達しました: {e}") from e
+
+        except openai.APITimeoutError as e:
+            logger.exception("OpenAI APIタイムアウト(ストリーミング)")
+            raise TimeoutError(f"OpenAI APIがタイムアウトしました: {e}") from e
 
         except Exception as e:
-            logger.error(f"OpenAIストリーミングエラー: {e}")
-            raise ProviderError(f"OpenAIストリーミングに失敗しました: {e}")
+            logger.exception("OpenAIストリーミングエラー")
+            raise ProviderError(f"OpenAIストリーミングに失敗しました: {e}") from e
 
     def get_required_config_fields(self) -> list[str]:
         """
@@ -243,7 +270,7 @@ class OpenAIProvider(BaseProvider):
 
     def _make_api_request(self, prompt: str) -> str:
         """
-        OpenAI APIリクエストを実行（リトライ機能付き）
+        OpenAI APIリクエストを実行(リトライ機能付き)
 
         Args:
             prompt: 送信するプロンプト
@@ -274,18 +301,30 @@ class OpenAIProvider(BaseProvider):
 
                 raise ResponseError("OpenAI APIから空のレスポンスを受信しました")
 
-            except (openai.RateLimitError, openai.APITimeoutError) as e:
+            except (openai.RateLimitError, openai.APITimeoutError, openai.APIConnectionError) as e:
                 last_exception = e
                 if attempt < self.max_retries - 1:
-                    wait_time = 2 ** attempt  # 指数バックオフ
-                    logger.warning(f"OpenAI APIエラー、{wait_time}秒後にリトライ（{attempt + 1}/{self.max_retries}）: {e}")
+                    base = min(2 ** attempt, 32)
+                    wait_time = base + random.uniform(0, base * 0.25)  # ジッタ
+                    logger.warning(f"OpenAI API一時エラー、{wait_time:.2f}秒後にリトライ({attempt + 1}/{self.max_retries}): {e}")
                     time.sleep(wait_time)
                 else:
-                    raise e
+                    raise
 
-            except Exception as e:
+            except openai.APIError as e:
+                # 5xx のみリトライ対象
+                if getattr(e, "status_code", None) and 500 <= e.status_code < 600 and attempt < self.max_retries - 1:
+                    last_exception = e
+                    base = min(2 ** attempt, 32)
+                    wait_time = base + random.uniform(0, base * 0.25)
+                    logger.warning(f"OpenAI API {e.status_code}、{wait_time:.2f}秒後にリトライ({attempt + 1}/{self.max_retries}): {e}")
+                    time.sleep(wait_time)
+                    continue
+                raise
+
+            except Exception:
                 # リトライしないエラー
-                raise e
+                raise
 
         # すべてのリトライが失敗した場合
         if last_exception:
@@ -323,5 +362,6 @@ class OpenAIProvider(BaseProvider):
             'max_tokens': self.max_tokens,
             'temperature': self.temperature,
             'top_p': self.top_p,
-            'supported_models': self._get_supported_models()
+            'supported_models': self._get_supported_models(),
+            'sdk_version': getattr(openai, '__version__', None)
         }
