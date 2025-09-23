@@ -13,6 +13,8 @@ dist/
 downloads/
 eggs/
 .eggs/
+lib/
+lib64/
 pip-wheel-metadata/
 build/lib/
 build/lib64/
@@ -153,6 +155,9 @@ temp/
 .temp/
 
 # API keys and secrets
+.env.local
+.env.production
+.env.staging
 *.pem
 *.key
 *.crt
@@ -166,6 +171,8 @@ lazygit-config/
 # Testing
 tests.log
 test_results/
+.coverage
+htmlcov/
 
 # Documentation build
 docs/_build/
@@ -183,6 +190,7 @@ benchmark_results/
 # Backup files
 *.bak
 *.backup
+*~
 
 # Node.js (if any frontend components)
 node_modules/
@@ -200,4 +208,3 @@ local/
 dev/
 development/
 .serena/
-

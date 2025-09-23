@@ -48,6 +48,7 @@ setup(
             "pytest-mock>=3.11.1",
             "pytest-asyncio>=0.21.1",
             "pytest-cov>=4.1.0",
+            "psutil>=5.9.0",
             "black>=23.7.0",
             "flake8>=6.0.0",
             "mypy>=1.5.0",
@@ -59,8 +60,6 @@ setup(
         ],
     },
     include_package_data=True,
-    package_data={
-        "": ["config/*.yml", "config/*.yml.example", "docs/*.md"],
-    },
+    # MANIFEST.in を使用してファイルを含めるため、package_data は不要
     zip_safe=False,
 )

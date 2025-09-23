@@ -14,6 +14,9 @@ import shutil
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
 from io import StringIO
+from collections import OrderedDict
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 from .security_validator import SecurityValidator
 
@@ -43,19 +46,38 @@ class GitDiffProcessor:
 
     標準入力からgit diffの出力を読み取り、解析してLLM向けにフォーマットする。
     LazyGitとの統合において、ステージされた変更の有無を確認する機能も提供。
+    パフォーマンス最適化として、キャッシュ機能と並行処理をサポート。
     subprocess経由でのgitコマンド実行による差分取得もサポート。
     """
 
-    def __init__(self, max_diff_size: int = 50000):
+    def __init__(self, max_diff_size: int = 50000, enable_parallel_processing: bool = True):
         """
         Git差分プロセッサーを初期化
 
         Args:
-            max_diff_size: 処理する差分の最大サイズ(バイト)
+            max_diff_size: 処理する差分の最大サイズ（バイト）
+            enable_parallel_processing: 並行処理を有効にするかどうか
         """
         self.max_diff_size = max_diff_size
+        self.enable_parallel_processing = enable_parallel_processing
         self._cached_diff_data: Optional[DiffData] = None
+        self._processing_cache: "OrderedDict[str, str]" = OrderedDict()
+        self._cache_lock = threading.Lock()
+        self._cache_maxsize = 128
         self.security_validator = SecurityValidator()
+
+        # 並行処理用のThreadPoolExecutor（オンデマンド作成）
+        self._executor = None
+
+    def _get_executor(self) -> Optional[ThreadPoolExecutor]:
+        """ThreadPoolExecutorを取得（必要時に作成）"""
+        if not self.enable_parallel_processing:
+            return None
+
+        with self._cache_lock:
+            if self._executor is None:
+                self._executor = ThreadPoolExecutor(max_workers=2)
+            return self._executor
 
     def read_staged_diff(self) -> str:
         """
@@ -486,3 +508,201 @@ class GitDiffProcessor:
 
         # 最低限の条件: diffヘッダーまたはファイルヘッダーが存在
         return has_file_header or has_diff_header
+
+    def _cached_format_diff(self, diff_hash: str, diff: str) -> str:
+        """
+        自前LRUキャッシュを使用した差分フォーマット処理
+
+        Args:
+            diff_hash: 差分のハッシュ値（キャッシュキーとして使用）
+            diff: 差分内容
+
+        Returns:
+            フォーマットされた差分
+        """
+        with self._cache_lock:
+            # キャッシュヒット確認
+            if diff_hash in self._processing_cache:
+                # LRU更新（最後に移動）
+                value = self._processing_cache.pop(diff_hash)
+                self._processing_cache[diff_hash] = value
+                return value
+
+            # キャッシュミス - 新しい値を計算
+            result = self._format_diff_internal(diff)
+
+            # キャッシュに保存
+            self._processing_cache[diff_hash] = result
+
+            # 容量制限チェック
+            if len(self._processing_cache) > self._cache_maxsize:
+                # 最古のエントリを削除
+                self._processing_cache.popitem(last=False)
+
+            return result
+
+    def _format_diff_internal(self, diff: str) -> str:
+        """
+        内部的な差分フォーマット処理（キャッシュから呼び出される）
+
+        Args:
+            diff: 差分内容
+
+        Returns:
+            フォーマットされた差分
+        """
+        if not diff or not diff.strip():
+            return "No changes detected"
+
+        # 並行処理が有効な場合は並行フォーマットを使用
+        executor = self._get_executor()
+        if executor:
+            return self._parallel_format_diff(diff)
+        else:
+            return self._sequential_format_diff(diff)
+
+    def _sequential_format_diff(self, diff: str) -> str:
+        """
+        順次処理による差分フォーマット
+
+        Args:
+            diff: 差分内容
+
+        Returns:
+            フォーマットされた差分
+        """
+        diff_data = self._parse_diff(diff)
+        formatted_lines = []
+
+        # ヘッダー情報を追加
+        formatted_lines.append(f"Files changed: {diff_data.file_count}")
+        formatted_lines.append(f"Additions: +{diff_data.additions}")
+        formatted_lines.append(f"Deletions: -{diff_data.deletions}")
+        formatted_lines.append("")
+
+        # 変更されたファイル一覧
+        if diff_data.files_changed:
+            formatted_lines.append("Changed files:")
+            for file_path in diff_data.files_changed:
+                formatted_lines.append(f"  - {file_path}")
+            formatted_lines.append("")
+
+        # 実際の差分内容
+        filtered_diff = self._filter_diff_content(diff)
+        if filtered_diff:
+            formatted_lines.append("Diff content:")
+            formatted_lines.append(filtered_diff)
+
+        return "\n".join(formatted_lines)
+
+    def _parallel_format_diff(self, diff: str) -> str:
+        """
+        並行処理による差分フォーマット
+
+        Args:
+            diff: 差分内容
+
+        Returns:
+            フォーマットされた差分
+        """
+        # 大きな差分の場合のみ並行処理を使用
+        if len(diff) < 10000:  # 10KB未満の場合は順次処理
+            return self._sequential_format_diff(diff)
+
+        # 差分解析とフィルタリングを並行実行
+        executor = self._get_executor()
+        future_parse = executor.submit(self._parse_diff, diff)
+        future_filter = executor.submit(self._filter_diff_content, diff)
+
+        try:
+            # 結果を取得
+            diff_data = future_parse.result(timeout=5.0)
+            filtered_diff = future_filter.result(timeout=5.0)
+
+            # フォーマット済み差分を構築
+            formatted_lines = []
+
+            # ヘッダー情報を追加
+            formatted_lines.append(f"Files changed: {diff_data.file_count}")
+            formatted_lines.append(f"Additions: +{diff_data.additions}")
+            formatted_lines.append(f"Deletions: -{diff_data.deletions}")
+            formatted_lines.append("")
+
+            # 変更されたファイル一覧
+            if diff_data.files_changed:
+                formatted_lines.append("Changed files:")
+                for file_path in diff_data.files_changed:
+                    formatted_lines.append(f"  - {file_path}")
+                formatted_lines.append("")
+
+            # 実際の差分内容
+            if filtered_diff:
+                formatted_lines.append("Diff content:")
+                formatted_lines.append(filtered_diff)
+
+            return "\n".join(formatted_lines)
+
+        except Exception as e:
+            logger.warning(f"並行処理エラー、順次処理にフォールバック: {e}")
+            return self._sequential_format_diff(diff)
+
+    def clear_cache(self):
+        """
+        キャッシュをクリア
+        """
+        with self._cache_lock:
+            self._processing_cache.clear()
+        logger.debug("キャッシュをクリアしました")
+
+    def get_cache_info(self) -> Dict[str, Any]:
+        """
+        キャッシュ情報を取得
+
+        Returns:
+            キャッシュ統計情報
+        """
+        with self._cache_lock:
+            return {
+                'cache_size': len(self._processing_cache),
+                'cache_maxsize': self._cache_maxsize,
+            }
+
+    def optimize_for_performance(self, diff: str) -> str:
+        """
+        パフォーマンス最適化された差分処理
+
+        Args:
+            diff: 差分内容
+
+        Returns:
+            最適化処理された差分
+        """
+        # 入力サイズに応じて処理方法を選択
+        diff_size = len(diff.encode('utf-8'))
+
+        if diff_size == 0:
+            return "No changes detected"
+
+        # 小さな差分は単純処理
+        if diff_size < 1000:  # 1KB未満
+            return self._sequential_format_diff(diff)
+
+        # 中程度の差分はキャッシュを使用
+        if diff_size < 50000:  # 50KB未満
+            import hashlib
+            diff_hash = hashlib.sha256(diff.encode('utf-8')).hexdigest()
+            return self._cached_format_diff(diff_hash, diff)
+
+        # 大きな差分は並行処理と切り詰めを使用
+        truncated_diff = self._truncate_diff(diff)
+        if self.enable_parallel_processing:
+            return self._parallel_format_diff(truncated_diff)
+        else:
+            return self._sequential_format_diff(truncated_diff)
+
+    def __del__(self):
+        """
+        デストラクタ - リソースクリーンアップ
+        """
+        if hasattr(self, '_executor') and self._executor:
+            self._executor.shutdown(wait=True)

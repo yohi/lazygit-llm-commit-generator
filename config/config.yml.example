@@ -1,0 +1,92 @@
+# ===========================================
+# LazyGit LLM Commit Generator 設定例
+# ===========================================
+
+# 使用するLLMプロバイダー
+# 選択肢: openai, anthropic, gemini-api, gemini-cli, claude-code
+provider: "openai"
+
+# APIキー（環境変数使用を推奨）
+# API型プロバイダー（openai, anthropic, gemini-api）でのみ必要
+api_key: "${OPENAI_API_KEY}"
+
+# 使用するモデル名
+model_name: "gpt-4"
+
+# タイムアウト設定（秒）
+timeout: 30
+
+# 最大トークン数
+max_tokens: 100
+
+# プロンプトテンプレート
+# {diff} プレースホルダーは必須
+prompt_template: |
+  Based on the following git diff, generate a concise commit message
+  that follows conventional commits format:
+
+  {diff}
+
+  Generate only the commit message, no additional text.
+
+# プロバイダー固有の追加パラメータ
+additional_params:
+  temperature: 0.3
+  top_p: 0.9
+
+# ===========================================
+# プロバイダー別設定例
+# ===========================================
+
+# OpenAI GPT設定例
+# provider: "openai"
+# api_key: "${OPENAI_API_KEY}"
+# model_name: "gpt-4"  # gpt-4, gpt-3.5-turbo
+
+# Anthropic Claude設定例
+# provider: "anthropic"
+# api_key: "${ANTHROPIC_API_KEY}"
+# model_name: "claude-3-5-sonnet-20241022"
+
+# Google Gemini API設定例
+# provider: "gemini-api"
+# api_key: "${GOOGLE_API_KEY}"
+# model_name: "gemini-1.5-pro"
+
+# Google Gemini CLI設定例
+# provider: "gemini-cli"
+# model_name: "gemini-1.5-pro"
+# （gcloud CLI認証が必要）
+
+# Claude Code CLI設定例
+# provider: "claude-code"
+# model_name: "claude-3-5-sonnet-20241022"
+# （claude-code CLI認証が必要）
+
+# ===========================================
+# カスタムプロンプト例
+# ===========================================
+
+# 日本語コミットメッセージ
+# prompt_template: |
+#   以下のGit差分に基づいて、簡潔で分かりやすい日本語のコミットメッセージを生成してください：
+#
+#   {diff}
+#
+#   形式: [種類] 簡潔な説明
+#   種類の例: feat, fix, docs, style, refactor, test, chore
+
+# 詳細コミットメッセージ
+# prompt_template: |
+#   Generate a detailed commit message based on this git diff:
+#
+#   {diff}
+#
+#   Format:
+#   <type>(<scope>): <subject>
+#
+#   <body>
+#
+#   - Focus on the 'why' rather than 'what'
+#   - Use imperative mood
+#   - Wrap lines at 72 characters
