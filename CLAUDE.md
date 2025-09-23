@@ -10,65 +10,75 @@ LazyGit LLM Commit Generator is a Python tool that integrates with LazyGit to au
 
 ### Setup and Installation
 ```bash
-# Install in development mode
-pip install -e .
+# Initialize UV project with all dependencies
+uv sync --extra dev
 
-# Install dependencies
-pip install -r requirements.txt
+# Install project in development mode
+uv pip install -e .
 
 # Run the installation script
-python3 install.py
+uv run python install.py
 ```
 
 ### Testing
 ```bash
 # Run all tests
-python -m pytest tests/
+uv run pytest tests/
 
 # Run specific test categories
-python -m pytest tests/ -m unit          # Unit tests only
-python -m pytest tests/ -m integration   # Integration tests only
-python -m pytest tests/ -m performance   # Performance tests only
-python -m pytest tests/ -m "not slow"    # Exclude slow tests
+uv run pytest tests/ -m unit          # Unit tests only
+uv run pytest tests/ -m integration   # Integration tests only
+uv run pytest tests/ -m performance   # Performance tests only
+uv run pytest tests/ -m "not slow"    # Exclude slow tests
 
 # Run single test file
-python -m pytest tests/test_config_manager.py
+uv run pytest tests/test_config_manager.py
 
 # Run with coverage
-python -m pytest tests/ --cov=lazygit_llm --cov-report=html
+uv run pytest tests/ --cov=lazygit_llm --cov-report=html
 ```
 
 ### Code Quality
 ```bash
 # Format code
-black lazygit-llm/lazygit_llm/
+uv run black lazygit-llm/lazygit_llm/
 
 # Lint code
-flake8 lazygit-llm/lazygit_llm/
+uv run flake8 lazygit-llm/lazygit_llm/
 
 # Type checking
-mypy lazygit-llm/lazygit_llm/
+uv run mypy lazygit-llm/lazygit_llm/
 ```
 
 ### Configuration Testing
 ```bash
 # Test configuration
-python3 lazygit-llm/lazygit_llm/main.py --test-config
+uv run python lazygit-llm/lazygit_llm/main.py --test-config
 
 # Run with verbose logging
-python3 lazygit-llm/lazygit_llm/main.py --verbose
+uv run python lazygit-llm/lazygit_llm/main.py --verbose
+
+# Run using installed command
+uv run lazygit-llm-generate --test-config
 ```
 
 ### Packaging
 ```bash
-# Test packaging
-./test_packaging.sh
+# Build package using UV
+uv build
 
-# Verify packaging
-python3 verify_packaging.py
+# Install package locally for testing
+uv pip install dist/*.whl
 
-# Build distribution
-python setup.py sdist bdist_wheel
+# Create development environment
+uv venv
+source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+
+# Add new dependencies
+uv add package_name
+
+# Add development dependencies
+uv add --dev package_name
 ```
 
 ## Architecture Overview

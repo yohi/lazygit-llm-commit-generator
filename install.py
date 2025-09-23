@@ -43,13 +43,15 @@ class Installer:
 
         # システム要件
         self.min_python_version = (3, 9)
-        self.required_commands = ['git', 'python3', 'pip3']
+        self.required_commands = ['git']
+        self.recommended_commands = ['uv']  # UV は推奨
 
         # LazyGitの設定パス候補
         self.lazygit_config_paths = [
             Path.home() / ".config" / "lazygit" / "config.yml",
             Path.home() / ".lazygit.yml",
-            Path.home() / "AppData" / "Local" / "lazygit" / "config.yml",  # Windows
+            Path.home() / "AppData" / "Local" / "lazygit" / "config.yml",  # Windows Local
+            Path.home() / "AppData" / "Roaming" / "lazygit" / "config.yml",  # Windows Roaming
         ]
 
     def install(self, interactive: bool = True) -> bool:
@@ -74,24 +76,28 @@ class Installer:
             print("\n2️⃣ Python環境チェック")
             self.check_python_environment()
 
+            # UV推奨とセットアップ
+            print("\n3️⃣ パッケージ管理ツール確認")
+            self.check_package_manager()
+
             # 依存関係インストール
-            print("\n3️⃣ 依存関係インストール")
+            print("\n4️⃣ 依存関係インストール")
             self.install_dependencies()
 
             # 設定ファイル作成
-            print("\n4️⃣ 設定ファイル作成")
+            print("\n5️⃣ 設定ファイル作成")
             config_created = self.create_config_file(interactive)
 
             # LazyGit統合
-            print("\n5️⃣ LazyGit統合設定")
+            print("\n6️⃣ LazyGit統合設定")
             lazygit_configured = self.configure_lazygit(interactive)
 
             # 実行可能スクリプト作成
-            print("\n6️⃣ 実行可能スクリプト作成")
+            print("\n7️⃣ 実行可能スクリプト作成")
             self.create_executable_script()
 
             # 動作確認
-            print("\n7️⃣ 動作確認テスト")
+            print("\n8️⃣ 動作確認テスト")
             self.test_installation()
 
             # インストール完了
@@ -145,34 +151,79 @@ class Installer:
 
         print(f"   ✅ Python {current_version[0]}.{current_version[1]} を確認")
 
+        # pipの確認（UV環境では不要）
+        uv_available = shutil.which('uv') is not None
+        if not uv_available:
+            try:
+                result = subprocess.run([sys.executable, "-m", "pip", "--version"],
+                                      capture_output=True, text=True, check=True)
+                print(f"   ✅ pip を確認: {result.stdout.strip()}")
+            except subprocess.CalledProcessError as e:
+                raise InstallationError("pip が利用できません。") from e
+        else:
+            print("   ✅ UV環境が利用可能なためpipチェックをスキップ")
+
+    def check_package_manager(self) -> None:
+        """パッケージ管理ツール（UV推奨）をチェック"""
+        print("   パッケージ管理ツールを確認中...")
+
+        # UVの確認
+        uv_available = shutil.which('uv') is not None
+        if uv_available:
+            try:
+                result = subprocess.run(['uv', '--version'], capture_output=True, text=True, check=True)
+                print(f"   ✅ UV を確認: {result.stdout.strip()}")
+                print("   💡 UV環境での高速セットアップが利用可能です")
+                return
+            except subprocess.CalledProcessError:
+                pass
+
+        # UVが利用できない場合はpipを使用
+        print("   ⚠️ UV が見つかりません。pipを使用します")
+        print("   💡 高速化のためUVの導入を推奨:")
+        print("      https://docs.astral.sh/uv/getting-started/installation/")
+
         # pipの確認
         try:
             result = subprocess.run([sys.executable, "-m", "pip", "--version"],
                                   capture_output=True, text=True, check=True)
             print(f"   ✅ pip を確認: {result.stdout.strip()}")
-        except subprocess.CalledProcessError:
-            raise InstallationError("pip が利用できません。Pythonの再インストールが必要な可能性があります。")
+        except subprocess.CalledProcessError as e:
+            raise InstallationError("pip が利用できません。") from e
 
     def install_dependencies(self) -> None:
         """依存関係をインストール"""
         print("   依存関係をインストール中...")
 
+        # pyproject.tomlの存在を確認
+        pyproject_file = self.script_dir / "pyproject.toml"
         requirements_file = self.script_dir / "requirements.txt"
-        if not requirements_file.exists():
-            raise InstallationError(f"requirements.txt が見つかりません: {requirements_file}")
+
+        uv_available = shutil.which('uv') is not None
 
         try:
-            # pip install を実行
-            cmd = [sys.executable, "-m", "pip", "install", "-r", str(requirements_file)]
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            if uv_available and pyproject_file.exists():
+                # UVを使用してインストール
+                print("   📦 UV環境でセットアップ中...")
+                cmd = ['uv', 'sync', '--extra', 'dev']
+                subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=self.script_dir)
+                print("   ✅ UV環境でのセットアップ完了")
 
-            print("   ✅ 依存関係のインストール完了")
+            elif requirements_file.exists():
+                # pipを使用してインストール
+                print("   📦 pip環境でセットアップ中...")
+                cmd = [sys.executable, "-m", "pip", "install", "-r", str(requirements_file)]
+                subprocess.run(cmd, capture_output=True, text=True, check=True)
+                print("   ✅ pip環境でのセットアップ完了")
+
+            else:
+                raise InstallationError("pyproject.toml または requirements.txt が見つかりません")
 
             # インストールされたパッケージを確認
             self.verify_installed_packages()
 
         except subprocess.CalledProcessError as e:
-            logger.error(f"pip install エラー: {e.stderr}")
+            logger.error(f"依存関係インストールエラー: {e.stderr}")
             raise InstallationError(f"依存関係のインストールに失敗しました: {e.stderr}")
 
     def verify_installed_packages(self) -> None:
@@ -334,7 +385,7 @@ class Installer:
         """LazyGitにカスタムコマンドを追加"""
         import yaml
 
-        launcher = str(self.script_dir / "lazygit-llm-generate")
+        launcher = str(self.script_dir / ("lazygit-llm-generate.cmd" if os.name == "nt" else "lazygit-llm-generate"))
         config_path = str(self.config_dir / "config.yml")
         custom_command = {
             'key': '<c-g>',
@@ -378,11 +429,55 @@ class Installer:
         print("   実行可能スクリプトを作成中...")
 
         script_path = self.script_dir / "lazygit-llm-generate"
-        script_content = f"""#!/usr/bin/env python3
+        is_windows = os.name == "nt"
+
+        # UVが利用可能かチェック
+        uv_available = shutil.which('uv') is not None
+        pyproject_exists = (self.script_dir / "pyproject.toml").exists()
+
+        if is_windows:
+            # Windows: .cmd ランチャーを生成
+            script_path_cmd = script_path.with_suffix(".cmd")
+            if uv_available and pyproject_exists:
+                script_content_cmd = "@echo off\r\n" \
+                                     "setlocal\r\n" \
+                                     "set SCRIPT_DIR=%~dp0\r\n" \
+                                     "pushd \"%SCRIPT_DIR%\"\r\n" \
+                                     "where uv >nul 2>&1\r\n" \
+                                     "if %ERRORLEVEL%==0 (\r\n" \
+                                     "  uv run python lazygit-llm\\lazygit_llm\\main.py %*\r\n" \
+                                     ") else (\r\n" \
+                                     "  python lazygit-llm\\lazygit_llm\\main.py %*\r\n" \
+                                     ")\r\n" \
+                                     "popd\r\n"
+            else:
+                script_content_cmd = "@echo off\r\n" \
+                                     "set SCRIPT_DIR=%~dp0\r\n" \
+                                     "pushd \"%SCRIPT_DIR%\"\r\n" \
+                                     "python lazygit-llm\\lazygit_llm\\main.py %*\r\n" \
+                                     "popd\r\n"
+            with open(script_path_cmd, 'w', encoding='utf-8') as f:
+                f.write(script_content_cmd)
+            print(f"   ✅ 実行可能スクリプト作成: {script_path_cmd}")
+        else:
+            # POSIX: Bash/Python ランチャー
+            if uv_available and pyproject_exists:
+                # UV環境用のスクリプト
+                script_content = """#!/bin/bash
+# LazyGit LLM Commit Message Generator Launcher (UV version)
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# UV環境でメインスクリプトを実行
+uv run python lazygit-llm/lazygit_llm/main.py "$@"
+"""
+            else:
+                # 従来のPython環境用スクリプト
+                script_content = """#!/usr/bin/env python3
 # LazyGit LLM Commit Message Generator Launcher
 
 import sys
-import os
 from pathlib import Path
 
 # プロジェクトディレクトリをPATHに追加
@@ -391,36 +486,45 @@ sys.path.insert(0, str(project_dir))
 
 # メインスクリプトを実行
 if __name__ == "__main__":
-    from src.main import main
+    from lazygit_llm.main import main
     sys.exit(main())
 """
-
-        # スクリプトを作成
-        with open(script_path, 'w', encoding='utf-8') as f:
-            f.write(script_content)
-
-        # 実行権限を付与
-        try:
-            os.chmod(script_path, 0o755)
-            print(f"   ✅ 実行可能スクリプト作成: {script_path}")
-        except OSError as e:
-            logger.warning(f"実行権限設定に失敗: {e}")
-            print(f"   ⚠️ 実行権限を手動で設定してください: chmod +x {script_path}")
+            with open(script_path, 'w', encoding='utf-8') as f:
+                f.write(script_content)
+            try:
+                os.chmod(script_path, 0o755)
+                print(f"   ✅ 実行可能スクリプト作成: {script_path}")
+            except OSError as e:
+                logger.warning(f"実行権限設定に失敗: {e}")
+                print(f"   ⚠️ 実行権限を手動で設定してください: chmod +x {script_path}")
 
     def test_installation(self) -> None:
         """インストールをテスト"""
         print("   動作確認中...")
 
         try:
-            # 設定テストを実行
-            cmd = [
-                sys.executable,
-                str(self.src_dir / "main.py"),
-                "--config", str(self.config_dir / "config.yml"),
-                "--test-config"
-            ]
+            # UVが利用可能かチェック
+            uv_available = shutil.which('uv') is not None
+            pyproject_exists = (self.script_dir / "pyproject.toml").exists()
 
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            if uv_available and pyproject_exists:
+                # UV環境でテスト実行
+                cmd = [
+                    'uv', 'run', 'python',
+                    str(self.project_dir / "lazygit_llm" / "main.py"),
+                    "--config", str(self.config_dir / "config.yml"),
+                    "--test-config"
+                ]
+            else:
+                # 従来のPython環境でテスト実行
+                cmd = [
+                    sys.executable,
+                    str(self.project_dir / "lazygit_llm" / "main.py"),
+                    "--config", str(self.config_dir / "config.yml"),
+                    "--test-config"
+                ]
+
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15, cwd=self.script_dir)
 
             if result.returncode == 0:
                 print("   ✅ 動作確認テスト成功")

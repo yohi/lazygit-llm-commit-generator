@@ -7,18 +7,22 @@ MessageFormatterクラスの包括的なテストが実装されています。
 ### テスト実行方法
 
 ```bash
-# 全テストを実行
+# プロジェクトルートから実行（推奨）
+# UV環境を使用
+uv run pytest lazygit-llm/tests/test_message_formatter.py -v
+
+# 特定のテストクラスを実行
+uv run pytest lazygit-llm/tests/test_message_formatter.py::TestMessageFormatter -v
+
+# カバレッジ付きで実行
+uv run pytest lazygit-llm/tests/test_message_formatter.py --cov=lazygit_llm.message_formatter
+
+# 従来の方法（lazygit-llmディレクトリ内から）
 cd lazygit-llm
 python -m pytest tests/test_message_formatter.py -v
 
-# 特定のテストクラスを実行
-python -m pytest tests/test_message_formatter.py::TestMessageFormatter -v
-
-# カバレッジ付きで実行
-python -m pytest tests/test_message_formatter.py --cov=lazygit_llm.message_formatter
-
 # 簡単なサンプル実行
-python tests/test_message_formatter.py
+uv run pytest lazygit-llm/tests/test_message_formatter.py -q
 ```
 
 ### テストカバレッジ
@@ -75,7 +79,11 @@ python tests/test_message_formatter.py
 ### 必要な依存関係
 
 ```bash
-pip install pytest pytest-mock
+# UV環境を使用（推奨、開発依存関係含む）
+uv sync --extra dev
+
+# または従来のpipを使用
+pip install pytest pytest-mock pytest-cov
 ```
 
 ### テスト品質
