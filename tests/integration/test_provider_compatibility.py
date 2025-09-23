@@ -225,7 +225,7 @@ index 0000000..1234567
             config = self.create_provider_config(provider_name)
 
             with patch(provider_class_path) as mock_provider_class:
-                for error, description in error_scenarios:
+                for error, _ in error_scenarios:
                     mock_provider = Mock()
                     mock_provider.generate_commit_message.side_effect = error
                     mock_provider_class.return_value = mock_provider
@@ -344,7 +344,7 @@ index 0000000..1234567
         """プロバイダー切り替え互換性テスト"""
         providers = ['openai', 'anthropic', 'gemini-api']
 
-        for i, provider_name in enumerate(providers):
+        for provider_name in providers:
             config = self.create_provider_config(provider_name)
 
             # プロバイダーパッケージパスを決定
@@ -381,9 +381,12 @@ index 0000000..1234567
             config = self.create_provider_config(provider_name)
 
             package_path = f'lazygit_llm.src.api_providers.{provider_name}_provider'
-            class_name = f'{provider_name.title()}Provider'
-            if provider_name == 'gemini-api':
-                class_name = 'GeminiApiProvider'
+            class_map = {
+                'openai': 'OpenAIProvider',
+                'anthropic': 'AnthropicProvider',
+                'gemini-api': 'GeminiApiProvider',
+            }
+            class_name = class_map.get(provider_name, f'{provider_name.title()}Provider')
 
             with patch(f'{package_path}.{class_name}') as mock_provider_class:
                 mock_provider = Mock()
@@ -487,9 +490,12 @@ index 0000000..1234567
             fallback_config = self.create_provider_config(fallback_provider)
 
             package_path = f'lazygit_llm.src.api_providers.{fallback_provider}_provider'
-            class_name = f'{fallback_provider.title()}Provider'
-            if fallback_provider == 'gemini-api':
-                class_name = 'GeminiApiProvider'
+            class_map = {
+                'openai': 'OpenAIProvider',
+                'anthropic': 'AnthropicProvider',
+                'gemini-api': 'GeminiApiProvider',
+            }
+            class_name = class_map.get(fallback_provider, f'{fallback_provider.title()}Provider')
 
             with patch(f'{package_path}.{class_name}') as mock_provider_class:
                 mock_provider = Mock()

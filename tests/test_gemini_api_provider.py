@@ -429,7 +429,7 @@ class TestGeminiApiProvider:
         provider = GeminiApiProvider(self.config)
         endpoint = provider._build_api_endpoint()
 
-        expected_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent"
+        expected_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent"
         assert endpoint == expected_url
 
     def test_error_response_parsing(self, sample_git_diff):
