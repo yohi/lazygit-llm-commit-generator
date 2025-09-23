@@ -30,8 +30,11 @@ LazyGitと連携してLLM（Large Language Model）でコミットメッセー�
 git clone https://github.com/yohi/lazygit-llm-commit-generator.git
 cd lazygit-llm-commit-generator
 
-# インストールスクリプトを実行
-python3 install.py
+# UV環境のセットアップ（推奨）
+uv sync --extra dev
+
+# または、インストールスクリプトを実行
+uv run python install.py
 ```
 
 ### 2. 設定
@@ -73,6 +76,7 @@ customCommands:
 ## 📋 システム要件
 
 - **Python**: 3.9以上（推奨: 3.11+）
+- **UV**: 0.4.0以上（パッケージ管理、推奨）
 - **Git**: 2.0以上
 - **LazyGit**: 0.35以上
 - **OS**: Linux, macOS, Windows
@@ -82,6 +86,18 @@ customCommands:
 - `anthropic` - Anthropic Claude API利用
 - `google-generativeai` - Google Gemini API利用
 - `PyYAML` - 設定ファイル処理
+
+### UVのインストール
+```bash
+# Unix系OS（Linux/macOS）
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# pipを使用
+pip install uv
+```
 
 ## ⚙️ 設定
 
@@ -153,15 +169,18 @@ prompt_template: |
 
 ```bash
 # ステージ済み変更からコミットメッセージ生成
-git diff --staged | lazygit-llm-generate
+git diff --staged | uv run lazygit-llm-generate
 
 # 設定ファイル指定
-lazygit-llm-generate --config /path/to/config.yml
+uv run lazygit-llm-generate --config /path/to/config.yml
 
 # 詳細ログ出力
-lazygit-llm-generate --verbose
+uv run lazygit-llm-generate --verbose
 
 # 設定テスト
+uv run lazygit-llm-generate --test-config
+
+# 従来のpip環境でインストール済みの場合
 lazygit-llm-generate --test-config
 ```
 
@@ -210,8 +229,10 @@ ModuleNotFoundError: No module named 'openai'
 ```
 **解決方法:**
 ```bash
-pip install -r requirements.txt
-# または個別インストール
+# UV環境を使用（推奨）
+uv sync --extra dev
+
+# または従来のpipを使用
 pip install openai anthropic google-generativeai PyYAML
 ```
 
@@ -229,13 +250,13 @@ chmod +x ~/.local/bin/lazygit-llm-generate
 
 ```bash
 # 詳細ログで実行して問題を特定
-lazygit-llm-generate --verbose
+uv run lazygit-llm-generate --verbose
 
 # ログファイル確認
 tail -f /tmp/lazygit-llm-*.log
 
 # 設定テスト
-lazygit-llm-generate --test-config
+uv run lazygit-llm-generate --test-config
 ```
 
 ## ⚡ パフォーマンス
@@ -262,15 +283,19 @@ additional_params:
 ### 開発環境構築
 
 ```bash
-# 開発モードでインストール
-pip install -e .
+# UV環境のセットアップ（推奨）
+uv sync --extra dev
 
 # テスト実行
-python -m pytest tests/
+uv run pytest tests/
 
 # コード品質チェック
-flake8 lazygit-llm/
-mypy lazygit-llm/
+uv run flake8 lazygit-llm/lazygit_llm/
+uv run mypy lazygit-llm/lazygit_llm/
+uv run black lazygit-llm/lazygit_llm/
+
+# パッケージビルド
+uv build
 ```
 
 ### 新しいプロバイダーの追加
