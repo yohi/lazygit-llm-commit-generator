@@ -60,9 +60,9 @@ class SecurityValidator:
     DANGEROUS_PATTERNS: ClassVar[List[str]] = [
         r'\.\./',                                  # パストラバーサル
         r'(?i)\bjavascript:',                      # JS URI
-        r'(?i)\bdata:(?:text|application)/\w+',    # Data URI（限定）
+        r'(?i)\bdata:(?:text|application)/\w+',    # Data URI(限定)
         r'(?is)<script\b[^>]*>.*?</script>',       # 明示的な script タグ
-        r'[\x00-\x08\x0B\x0C\x0E-\x1F]',           # 制御文字（改行/タブ除外）
+        r'[\x00-\x08\x0B\x0C\x0E-\x1F]',           # 制御文字(改行/タブ除外)
     ]
 
     # 機密情報パターン
