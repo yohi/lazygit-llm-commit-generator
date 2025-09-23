@@ -60,8 +60,6 @@ setup(
         ],
     },
     include_package_data=True,
-    package_data={
-        "": ["config/*.yml", "config/*.yml.example", "docs/*.md"],
-    },
+    # MANIFEST.in を使用してファイルを含めるため、package_data は不要
     zip_safe=False,
 )
