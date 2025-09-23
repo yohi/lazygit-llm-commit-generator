@@ -187,7 +187,7 @@ lazygit-llm-generate --test-config
 ### よくある問題
 
 #### 1. API認証エラー
-```
+```text
 ConfigError: API認証に失敗しました
 ```
 **解決方法:**
@@ -196,7 +196,7 @@ ConfigError: API認証に失敗しました
 - プロバイダーの利用制限を確認
 
 #### 2. LazyGitでCtrl+Gが動作しない
-```
+```text
 LazyGitでCtrl+Gが応答しない
 ```
 **解決方法:**
@@ -205,7 +205,7 @@ LazyGitでCtrl+Gが応答しない
 - 実行権限の確認
 
 #### 3. Pythonモジュールエラー
-```
+```text
 ModuleNotFoundError: No module named 'openai'
 ```
 **解決方法:**
@@ -216,7 +216,7 @@ pip install openai anthropic google-generativeai PyYAML
 ```
 
 #### 4. 権限エラー
-```
+```text
 PermissionError: [Errno 13] Permission denied
 ```
 **解決方法:**
