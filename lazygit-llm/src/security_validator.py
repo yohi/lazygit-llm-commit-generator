@@ -10,7 +10,7 @@ import hashlib
 import logging
 import os
 import stat
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List, Tuple, ClassVar
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -35,7 +35,7 @@ class SecurityValidator:
     """
 
     # APIキーのパターン定義
-    API_KEY_PATTERNS = {
+    API_KEY_PATTERNS: ClassVar[Dict[str, Dict[str, Any]]] = {
         'openai': {
             'pattern': r'^sk-[A-Za-z0-9]{48}$',
             'min_length': 51,
@@ -57,7 +57,7 @@ class SecurityValidator:
     }
 
     # 危険な文字パターン
-    DANGEROUS_PATTERNS = [
+    DANGEROUS_PATTERNS: ClassVar[List[str]] = [
         r'[`$\\|&;()<>]',  # シェルインジェクション
         r'[{}[\]]',        # コードインジェクション
         r'["\']',          # クォートインジェクション
@@ -69,7 +69,7 @@ class SecurityValidator:
     ]
 
     # 機密情報パターン
-    SENSITIVE_PATTERNS = [
+    SENSITIVE_PATTERNS: ClassVar[List[str]] = [
         r'(?i)(password|passwd|pwd)\s*[:=]\s*[\'"]?([^\s\'"]{8,})',
         r'(?i)(secret|token|key)\s*[:=]\s*[\'"]?([^\s\'"]{16,})',
         r'(?i)(api[_-]?key)\s*[:=]\s*[\'"]?([^\s\'"]{20,})',
@@ -270,8 +270,8 @@ class SecurityValidator:
                     ]
                 )
 
-        except Exception as e:
-            logger.error(f"ファイル権限チェックエラー: {e}")
+        except (OSError, PermissionError, FileNotFoundError) as e:
+            logger.exception("ファイル権限チェックエラー")
             return SecurityCheckResult(
                 is_valid=False,
                 level="warning",
@@ -348,7 +348,6 @@ class SecurityValidator:
         has_upper = any(c.isupper() for c in api_key)
         has_lower = any(c.islower() for c in api_key)
         has_digit = any(c.isdigit() for c in api_key)
-        has_special = any(c in '-_' for c in api_key)
 
         if not (has_upper and has_lower and has_digit):
             issues.append("文字種の多様性が不足")
@@ -425,7 +424,6 @@ class SecurityValidator:
         Returns:
             (クリーンなコンテンツ, セキュリティチェック結果)
         """
-        original_content = content
         removed_patterns = []
 
         # 危険なパターンを順次除去
