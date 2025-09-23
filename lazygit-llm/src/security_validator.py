@@ -286,7 +286,7 @@ class SecurityValidator:
                     ]
                 )
 
-        except (OSError, PermissionError, FileNotFoundError) as e:
+        except (OSError, PermissionError, FileNotFoundError):
             logger.exception("ファイル権限チェックエラー")
             return SecurityCheckResult(
                 is_valid=False,
