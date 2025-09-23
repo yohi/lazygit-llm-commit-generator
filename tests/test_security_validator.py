@@ -134,7 +134,7 @@ class TestSecurityValidator:
         """機密情報を含む差分のサニタイゼーションテスト"""
         diff_with_secrets = """diff --git a/config.py b/config.py
 +password = "secret123"
-+api_key = "sk-1234567890abcdef"
++api_key = "sk-1234567890abcdef"  # gitleaks:allow - test only
 +database_url = "postgresql://user:pass@host:5432/db"
  normal_line = "safe content"
 +email = "user@example.com"
@@ -149,7 +149,7 @@ class TestSecurityValidator:
 
         # 機密情報が除去または置換されていることを確認
         assert "secret123" not in sanitized
-        assert "sk-1234567890abcdef" not in sanitized
+        assert "sk-1234567890abcdef" not in sanitized  # gitleaks:allow - test only
         assert "user:pass@host" not in sanitized
         assert "user@example.com" not in sanitized
         assert "123-456-7890" not in sanitized
@@ -315,9 +315,9 @@ google_api_key: AIza1234567890abcdef  # gitleaks:allow - test only
 """
         sanitized = self.validator._sanitize_sensitive_info(text_with_keys)
 
-        assert "sk-1234567890abcdef" not in sanitized
-        assert "sk-proj-abcdef1234567890" not in sanitized
-        assert "AIza1234567890abcdef" not in sanitized
+        assert "sk-1234567890abcdef" not in sanitized  # gitleaks:allow - test only
+        assert "sk-proj-abcdef1234567890" not in sanitized  # gitleaks:allow - test only
+        assert "AIza1234567890abcdef" not in sanitized  # gitleaks:allow - test only
         assert "[REDACTED]" in sanitized
 
     def test_sanitize_sensitive_info_urls(self):
@@ -372,7 +372,7 @@ class TestClass:
         assert len(patterns) == 0
 
     @pytest.mark.parametrize("provider,key,expected_valid", [
-        ("openai", "sk-1234567890abcdef1234567890abcdef12345678", True),
+        ("openai", "sk-1234567890abcdef1234567890abcdef12345678", True),  # gitleaks:allow - test only
         ("openai", "invalid", False),
         ("anthropic", "sk-ant-api03-" + "a" * 95, True),
         ("anthropic", "invalid", False),

@@ -172,7 +172,7 @@ index 0000000..1234567
         # APIキー検証
         api_key_result = validator.validate_api_key(
             'openai',
-            'sk-1234567890abcdef1234567890abcdef12345678'
+            'sk-1234567890abcdef1234567890abcdef12345678'  # gitleaks:allow - test only
         )
         assert api_key_result.is_valid
 

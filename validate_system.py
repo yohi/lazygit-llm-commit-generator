@@ -20,6 +20,7 @@ from unittest.mock import Mock, patch
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "lazygit-llm"))
+sys.path.insert(0, str(project_root / "lazygit-llm" / "src"))
 
 logger = logging.getLogger(__name__)
 
@@ -124,14 +125,13 @@ class SystemValidator:
         required_paths = [
             "lazygit-llm/",
             "lazygit-llm/src/",
-            "lazygit-llm/main.py",
-            "lazygit-llm/src/base_provider.py",
-            "lazygit-llm/src/config_manager.py",
+            "lazygit-llm/lazygit_llm/main.py",
+            "lazygit-llm/lazygit_llm/base_provider.py",
+            "lazygit-llm/lazygit_llm/config_manager.py",
             "lazygit-llm/lazygit_llm/git_processor.py",
-            "lazygit-llm/src/provider_factory.py",
+            "lazygit-llm/lazygit_llm/provider_factory.py",
             "lazygit-llm/src/security_validator.py",
-            "lazygit-llm/src/error_handler.py",
-            "lazygit-llm/src/message_formatter.py",
+            "lazygit-llm/lazygit_llm/message_formatter.py",
             "lazygit-llm/src/api_providers/",
             "lazygit-llm/src/cli_providers/",
             "config/",
@@ -155,19 +155,19 @@ class SystemValidator:
     def validate_python_modules(self) -> Tuple[bool, str]:
         """Pythonモジュールのインポートテスト"""
         modules_to_test = [
-            ("main", "メインエントリーポイント"),
-            ("src.base_provider", "プロバイダー基底クラス"),
-            ("src.config_manager", "設定管理"),
+            ("lazygit_llm.main", "メインエントリーポイント"),
+            ("base_provider", "プロバイダー基底クラス"),
+            ("config_manager", "設定管理"),
             ("lazygit_llm.git_processor", "Git差分処理"),
-            ("src.provider_factory", "プロバイダーファクトリ"),
-            ("src.security_validator", "セキュリティ検証"),
-            ("src.error_handler", "エラーハンドリング"),
-            ("src.message_formatter", "メッセージフォーマット"),
-            ("src.api_providers.openai_provider", "OpenAIプロバイダー"),
-            ("src.api_providers.anthropic_provider", "Anthropicプロバイダー"),
-            ("src.api_providers.gemini_api_provider", "Gemini APIプロバイダー"),
-            ("src.cli_providers.gemini_cli_provider", "Gemini CLIプロバイダー"),
-            ("src.cli_providers.claude_code_provider", "Claude Codeプロバイダー"),
+            ("provider_factory", "プロバイダーファクトリ"),
+            ("security_validator", "セキュリティ検証"),
+            ("error_handler", "エラーハンドリング"),
+            ("message_formatter", "メッセージフォーマット"),
+            ("api_providers.openai_provider", "OpenAIプロバイダー"),
+            ("api_providers.anthropic_provider", "Anthropicプロバイダー"),
+            ("api_providers.gemini_api_provider", "Gemini APIプロバイダー"),
+            ("cli_providers.gemini_cli_provider", "Gemini CLIプロバイダー"),
+            ("cli_providers.claude_code_provider", "Claude Codeプロバイダー"),
         ]
 
         failed_imports = []
@@ -216,13 +216,13 @@ class SystemValidator:
         """コアクラスの基本機能確認"""
         try:
             # BaseProviderの確認
-            from src.base_provider import BaseProvider, ProviderError
+            from base_provider import BaseProvider, ProviderError
             assert hasattr(BaseProvider, 'generate_commit_message')
             assert hasattr(BaseProvider, 'test_connection')
             assert hasattr(BaseProvider, 'supports_streaming')
 
             # ConfigManagerの確認
-            from src.config_manager import ConfigManager, ConfigError
+            from config_manager import ConfigManager, ConfigError
             config_manager = ConfigManager()
             assert hasattr(config_manager, 'load_config')
             assert hasattr(config_manager, 'validate_config')
@@ -241,7 +241,7 @@ class SystemValidator:
     def validate_provider_factory(self) -> Tuple[bool, str]:
         """プロバイダーファクトリの確認"""
         try:
-            from src.provider_factory import ProviderFactory, provider_registry
+            from provider_factory import ProviderFactory, provider_registry
 
             factory = ProviderFactory()
             available_providers = factory.get_available_providers()
@@ -264,7 +264,7 @@ class SystemValidator:
     def validate_security_features(self) -> Tuple[bool, str]:
         """セキュリティ機能の確認"""
         try:
-            from src.security_validator import SecurityValidator, SecurityCheckResult
+            from security_validator import SecurityValidator, SecurityCheckResult
 
             validator = SecurityValidator()
 
@@ -339,8 +339,8 @@ index 0000000..ed708ec
     def validate_error_handling(self) -> Tuple[bool, str]:
         """エラーハンドリングの確認"""
         try:
-            from src.error_handler import ErrorHandler, ErrorInfo
-            from src.base_provider import ProviderError
+            from error_handler import ErrorHandler, ErrorInfo
+            from base_provider import ProviderError
 
             error_handler = ErrorHandler(verbose=self.verbose)
 
@@ -348,7 +348,7 @@ index 0000000..ed708ec
             test_error = ProviderError("API authentication failed")
             error_info = error_handler.handle_error(test_error, {"provider": "openai"})
 
-            from src.error_handler import ErrorCategory
+            from error_handler import ErrorCategory
             if error_info.category != ErrorCategory.AUTHENTICATION:
                 return False, f"エラー分類が不正確（期待: AUTHENTICATION, 実際: {error_info.category}）"
 
@@ -365,7 +365,7 @@ index 0000000..ed708ec
     def validate_message_formatting(self) -> Tuple[bool, str]:
         """メッセージフォーマットの確認"""
         try:
-            from src.message_formatter import MessageFormatter
+            from message_formatter import MessageFormatter
 
             formatter = MessageFormatter()
 
@@ -392,7 +392,7 @@ index 0000000..ed708ec
     def validate_config_management(self) -> Tuple[bool, str]:
         """設定管理の確認"""
         try:
-            from src.config_manager import ConfigManager
+            from config_manager import ConfigManager
 
             # テスト用設定ファイル作成
             test_config = {
@@ -481,9 +481,9 @@ index 0000000..ed708ec
     def validate_execution_integration(self) -> Tuple[bool, str]:
         """実行統合テスト（モック使用）"""
         try:
-            from main import main
-            from src.config_manager import ConfigManager
-            from src.provider_factory import ProviderFactory
+            from lazygit_llm.main import main
+            from config_manager import ConfigManager
+            from provider_factory import ProviderFactory
 
             # テスト用設定
             test_config = {
@@ -506,7 +506,7 @@ index 0000000..ed708ec
                     # モックを使用してエンドツーエンドテスト
                     with patch('sys.stdin') as mock_stdin, \
                          patch('sys.argv', ['main.py', '--config', f.name, '--test-config']), \
-                         patch('src.api_providers.openai_provider.OpenAIProvider.generate_commit_message') as mock_generate:
+                         patch('api_providers.openai_provider.OpenAIProvider.generate_commit_message') as mock_generate:
 
                         mock_stdin.read.return_value = test_diff
                         mock_generate.return_value = "feat: add new feature"

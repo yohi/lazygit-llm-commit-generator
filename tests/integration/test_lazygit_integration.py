@@ -205,7 +205,7 @@ index 0000000..1234567
     def test_environment_variable_integration(self):
         """環境変数を使用したLazyGit統合テスト"""
         test_env = {
-            'OPENAI_API_KEY': 'sk-test1234567890abcdef1234567890abcdef12345678',
+            'OPENAI_API_KEY': 'sk-test1234567890abcdef1234567890abcdef12345678',  # gitleaks:allow - test only
             'LAZYGIT_LLM_PROVIDER': 'openai',
             'LAZYGIT_LLM_MODEL': 'gpt-3.5-turbo',
         }

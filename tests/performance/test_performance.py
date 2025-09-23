@@ -419,7 +419,7 @@ additional_params:
             processed_diff = processor.format_diff_for_llm(diff)
             message = f"feat: iteration {i} with {diff_size} lines"
             formatted_message = formatter.format_response(message)
-            validator.validate_api_key("openai", "sk-1234567890abcdef1234567890abcdef12345678")
+            validator.validate_api_key("openai", "sk-1234567890abcdef1234567890abcdef12345678")  # gitleaks:allow - test only
 
             # 進行状況の確認
             if i % 100 == 0 and i > 0:

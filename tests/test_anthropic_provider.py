@@ -18,7 +18,7 @@ class TestAnthropicProvider:
     def setup_method(self):
         """各テストメソッドの前に実行"""
         self.config = {
-            'api_key': 'sk-ant-api03-test-api-key-1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef-1234567890abcdef',
+            'api_key': 'sk-ant-api03-test-api-key-1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef-1234567890abcdef',  # gitleaks:allow - test only
             'model_name': 'claude-3-5-sonnet-20241022',
             'timeout': 30,
             'max_tokens': 100,
