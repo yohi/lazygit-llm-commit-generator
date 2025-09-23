@@ -337,9 +337,11 @@ class Installer:
         # 実行スクリプトのパス
         script_path = self.script_dir / "lazygit-llm-generate"
 
+        launcher = str(self.script_dir / "lazygit-llm-generate")
+        config_path = str(self.config_dir / "config.yml")
         custom_command = {
             'key': '<c-g>',
-            'command': f'git diff --staged | python3 {self.src_dir / "main.py"} --config {self.config_dir / "config.yml"}',
+            'command': f'git diff --staged | "{launcher}" --config "{config_path}"',
             'context': 'files',
             'description': 'Generate commit message with LLM',
             'stream': True
@@ -454,7 +456,7 @@ if __name__ == "__main__":
             print("2. LazyGitに以下の設定を手動で追加:")
             print("   customCommands:")
             print("     - key: '<c-g>'")
-            print(f"       command: 'git diff --staged | python3 {self.src_dir / 'main.py'}'")
+            print(f"       command: 'git diff --staged | \"{self.script_dir / 'lazygit-llm-generate'}\"'")
             print("       context: 'files'")
             print("       description: 'Generate commit message with LLM'")
             print("       stream: true")

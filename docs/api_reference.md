@@ -675,9 +675,9 @@ class SecurityError(LazygitLLMError):
 ### 基本的な使用例
 
 ```python
-from lazygit_llm.src.config_manager import ConfigManager
-from lazygit_llm.src.provider_factory import ProviderFactory
-from lazygit_llm.src.git_processor import GitDiffProcessor
+from lazygit_llm.config_manager import ConfigManager
+from lazygit_llm.provider_factory import ProviderFactory
+from lazygit_llm.git_processor import GitDiffProcessor
 
 # 設定読み込み
 config_manager = ConfigManager()
@@ -700,7 +700,7 @@ print(message)
 ### カスタムプロバイダーの作成
 
 ```python
-from lazygit_llm.src.base_provider import BaseProvider
+from lazygit_llm.base_provider import BaseProvider
 
 class CustomProvider(BaseProvider):
     """カスタムLLMプロバイダー"""
@@ -721,7 +721,7 @@ class CustomProvider(BaseProvider):
         return False
 
 # プロバイダー登録
-from lazygit_llm.src.provider_factory import ProviderFactory
+from lazygit_llm.provider_factory import ProviderFactory
 factory = ProviderFactory()
 factory.register_provider("custom", CustomProvider)
 ```

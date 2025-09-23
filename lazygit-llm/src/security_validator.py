@@ -14,7 +14,7 @@ import threading
 from typing import Dict, Any, Optional, List, Tuple, ClassVar
 from pathlib import Path
 from dataclasses import dataclass
-from functools import lru_cache
+# from functools import lru_cache  # インスタンスメソッドのメモリリーク回避のため削除
 from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
@@ -579,25 +579,26 @@ class SecurityValidator:
         Returns:
             セキュリティ推奨事項のリスト
         """
-    @lru_cache(maxsize=128)
-    def _cached_validate_api_key(self, provider: str, api_key_hash: str, key_length: int) -> SecurityCheckResult:
+    @staticmethod
+    def _cached_validate_api_key(provider: str, key_length: int) -> SecurityCheckResult:
         """
-        LRUキャッシュを使用したAPIキー検証
+        静的なAPIキー形式検証（メモリリーク回避版）
 
         Args:
             provider: プロバイダー名
-            api_key_hash: APIキーのハッシュ値（キャッシュキーとして使用）
             key_length: APIキーの長さ
 
         Returns:
             セキュリティチェック結果
         """
-        with self._cache_lock:
-            self._processing_stats['cache_hits'] += 1
+        # 定数パターンを使用（インスタンス非依存）
+        api_key_patterns = {
+            'openai': {'min_length': 48, 'max_length': 56, 'pattern': r'^sk-(proj-)?[A-Za-z0-9]{20,}$'},
+            'anthropic': {'min_length': 25, 'max_length': 100, 'pattern': r'^sk-ant-api[0-9]{2}-[A-Za-z0-9_-]{95}$'},
+            'gemini': {'min_length': 39, 'max_length': 39, 'pattern': r'^AIza[A-Za-z0-9_-]{35}$'},
+        }
 
-        # ハッシュされたキーから元の検証ロジックを復元
-        # 注意: 実際のキー内容は復元できないため、基本的な検証のみ
-        pattern_info = self.API_KEY_PATTERNS.get(provider.lower())
+        pattern_info = api_key_patterns.get(provider.lower())
         if pattern_info:
             if not (pattern_info['min_length'] <= key_length <= pattern_info['max_length']):
                 return SecurityCheckResult(
@@ -613,38 +614,35 @@ class SecurityValidator:
         return SecurityCheckResult(
             is_valid=True,
             level="safe",
-            message="APIキーの形式は有効です（キャッシュヒット）",
+            message="APIキーの形式は有効です",
             recommendations=[]
         )
 
-    @lru_cache(maxsize=256)
-    def _cached_sanitize_diff(self, diff_hash: str, diff_length: int) -> Tuple[str, SecurityCheckResult]:
+    @staticmethod
+    def _cached_sanitize_diff(diff_length: int, max_diff_size: int) -> Tuple[str, SecurityCheckResult]:
         """
-        LRUキャッシュを使用したGit差分サニタイゼーション
+        静的な差分サイズ検証（メモリリーク回避版）
 
         Args:
-            diff_hash: 差分のハッシュ値（キャッシュキーとして使用）
             diff_length: 差分の長さ
+            max_diff_size: 最大許可サイズ
 
         Returns:
             (サニタイゼーション済み差分の状態, セキュリティチェック結果)
         """
-        with self._cache_lock:
-            self._processing_stats['cache_hits'] += 1
-
         # 基本的なサイズチェック
-        if diff_length > self.max_diff_size:
+        if diff_length > max_diff_size:
             return "truncated", SecurityCheckResult(
                 is_valid=True,
                 level="warning",
-                message=f"差分サイズが制限を超過、切り詰めました（キャッシュヒット）",
+                message=f"差分サイズが制限を超過、切り詰めました",
                 recommendations=["大きなファイルの変更は分割することを検討してください"]
             )
 
         return "clean", SecurityCheckResult(
             is_valid=True,
             level="safe",
-            message=f"差分のサニタイゼーション完了（キャッシュヒット）",
+            message=f"差分のサニタイゼーション完了",
             recommendations=[]
         )
 
@@ -698,7 +696,7 @@ class SecurityValidator:
             try:
                 with self._cache_lock:
                     self._processing_stats['cache_hits'] += 1
-                return self._cached_validate_api_key(provider, api_key_hash, len(api_key))
+                return self._cached_validate_api_key(provider, len(api_key))
             except Exception:
                 with self._cache_lock:
                     self._processing_stats['cache_misses'] += 1
@@ -735,9 +733,9 @@ class SecurityValidator:
 
         # 中程度の差分はキャッシュを使用
         if diff_size < 50000 and self.enable_caching:
-            diff_hash = hashlib.md5(diff_content.encode('utf-8')).hexdigest()
+            diff_hash = hashlib.sha256(diff_content.encode('utf-8')).hexdigest()
             try:
-                cached_status, cached_result = self._cached_sanitize_diff(diff_hash, diff_size)
+                cached_status, cached_result = self._cached_sanitize_diff(diff_size, self.max_diff_size)
                 with self._cache_lock:
                     self._processing_stats['cache_hits'] += 1
 
@@ -832,22 +830,7 @@ class SecurityValidator:
         with self._cache_lock:
             stats = self._processing_stats.copy()
 
-        if self.enable_caching:
-            try:
-                api_cache_info = self._cached_validate_api_key.cache_info()
-                diff_cache_info = self._cached_sanitize_diff.cache_info()
-
-                stats.update({
-                    'api_key_cache_hits': api_cache_info.hits,
-                    'api_key_cache_misses': api_cache_info.misses,
-                    'api_key_cache_size': api_cache_info.currsize,
-                    'diff_cache_hits': diff_cache_info.hits,
-                    'diff_cache_misses': diff_cache_info.misses,
-                    'diff_cache_size': diff_cache_info.currsize
-                })
-            except AttributeError:
-                # LRUキャッシュが利用できない場合
-                pass
+        # 静的メソッド化によりキャッシュ統計は内部統計のみ利用
 
         return stats
 
@@ -855,12 +838,7 @@ class SecurityValidator:
         """
         キャッシュをクリア
         """
-        if self.enable_caching:
-            try:
-                self._cached_validate_api_key.cache_clear()
-                self._cached_sanitize_diff.cache_clear()
-            except AttributeError:
-                pass
+        # 静的メソッド化により個別キャッシュクリアは不要
 
         with self._cache_lock:
             self._processing_stats = {
@@ -877,19 +855,7 @@ class SecurityValidator:
         """
         メモリ使用量を最適化
         """
-        if self.enable_caching:
-            try:
-                api_cache_info = self._cached_validate_api_key.cache_info()
-                diff_cache_info = self._cached_sanitize_diff.cache_info()
-
-                # キャッシュが80%以上埋まっている場合は部分的にクリア
-                if (api_cache_info.currsize > api_cache_info.maxsize * 0.8 or
-                    diff_cache_info.currsize > diff_cache_info.maxsize * 0.8):
-                    self._cached_validate_api_key.cache_clear()
-                    self._cached_sanitize_diff.cache_clear()
-                    logger.debug("メモリ最適化のためキャッシュを部分的にクリアしました")
-            except AttributeError:
-                pass
+        # 静的メソッド化により個別キャッシュ管理は不要
 
         # 統計情報のリセット
         with self._cache_lock:
