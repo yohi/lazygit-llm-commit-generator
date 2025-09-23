@@ -18,7 +18,7 @@ from unittest.mock import Mock, patch
 
 # プロジェクトパスを追加
 project_root = Path(__file__).parent
-sys.path.insert(0, str(project_root / "lazygit-llm"))
+sys.path.insert(0, str(project_root))
 
 logger = logging.getLogger(__name__)
 
@@ -263,7 +263,7 @@ class SystemValidator:
     def validate_security_features(self) -> Tuple[bool, str]:
         """セキュリティ機能の確認"""
         try:
-            from lazygit_llm.security_validator import SecurityValidator, ValidationResult
+            from lazygit_llm.src.security_validator import SecurityValidator, SecurityCheckResult
 
             validator = SecurityValidator()
 
@@ -338,7 +338,7 @@ index 0000000..ed708ec
     def validate_error_handling(self) -> Tuple[bool, str]:
         """エラーハンドリングの確認"""
         try:
-            from lazygit_llm.error_handler import ErrorHandler, ErrorInfo
+            from lazygit_llm.src.error_handler import ErrorHandler, ErrorInfo
             from lazygit_llm.base_provider import ProviderError
 
             error_handler = ErrorHandler(verbose=self.verbose)
@@ -347,7 +347,7 @@ index 0000000..ed708ec
             test_error = ProviderError("API authentication failed")
             error_info = error_handler.handle_error(test_error, {"provider": "openai"})
 
-            from lazygit_llm.error_handler import ErrorCategory
+            from lazygit_llm.src.error_handler import ErrorCategory
             if error_info.category != ErrorCategory.AUTHENTICATION:
                 return False, f"エラー分類が不正確（期待: AUTHENTICATION, 実際: {error_info.category}）"
 

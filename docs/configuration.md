@@ -104,7 +104,6 @@ additional_params:
   temperature: 0.3           # 0.0-1.0
   top_p: 0.9                # 0.0-1.0
   top_k: 40                 # トップK制限
-  max_tokens_to_sample: 100 # Claude固有パラメータ
 ```
 
 ### Google Gemini API

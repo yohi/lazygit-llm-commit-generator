@@ -334,9 +334,6 @@ class Installer:
         """LazyGitにカスタムコマンドを追加"""
         import yaml
 
-        # 実行スクリプトのパス
-        script_path = self.script_dir / "lazygit-llm-generate"
-
         launcher = str(self.script_dir / "lazygit-llm-generate")
         config_path = str(self.config_dir / "config.yml")
         custom_command = {
