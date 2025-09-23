@@ -35,16 +35,26 @@ class ProviderFactory:
         """
         provider_config = config.get('provider', {})
 
-        if not isinstance(provider_config, Mapping):
-            raise TypeError("provider設定がマッピングではありません")
-        # provider 実装は dict を前提とする可能性があるため実体化
-        provider_config = dict(provider_config)
-
-        provider_name = str(provider_config.get('name', '')).strip()
-        if not provider_name:
-            raise ValueError("provider.name が設定されていません")
-
-        provider_type = str(provider_config.get('type', '')).strip().lower()
+        # プロバイダー設定が文字列の場合（後方互換性のため）
+        if isinstance(provider_config, str):
+            provider_name = provider_config.strip()
+            # プロバイダー名から種類を推測
+            if provider_name.endswith('-cli') or provider_name in ['claude-code', 'gemini-native']:
+                provider_type = 'cli'
+            else:
+                provider_type = 'api'
+            # 文字列設定の場合、全体設定をコピーしてプロバイダー情報を追加
+            provider_config = dict(config)
+            provider_config['provider'] = {'name': provider_name, 'type': provider_type}
+        elif isinstance(provider_config, Mapping):
+            # provider 実装は dict を前提とする可能性があるため実体化
+            provider_config = dict(provider_config)
+            provider_name = str(provider_config.get('name', '')).strip()
+            if not provider_name:
+                raise ValueError("provider.name が設定されていません")
+            provider_type = str(provider_config.get('type', '')).strip().lower()
+        else:
+            raise TypeError("provider設定が文字列またはマッピングではありません")
         provider_class = None
 
         if not provider_type:
