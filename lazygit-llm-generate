@@ -1,0 +1,8 @@
+#!/bin/bash
+# LazyGit LLM Commit Message Generator Launcher (UV version)
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# UV環境でメインスクリプトを実行
+uv run python lazygit-llm/lazygit_llm/main.py "$@"

@@ -96,7 +96,10 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 
 # pipを使用
-pip install uv
+pip install uv  # グローバル環境に入る点に注意
+
+# pipxを使用（推奨）
+pipx install uv
 ```
 
 ## ⚙️ 設定

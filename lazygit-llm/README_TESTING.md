@@ -22,7 +22,7 @@ cd lazygit-llm
 python -m pytest tests/test_message_formatter.py -v
 
 # 簡単なサンプル実行
-uv run python lazygit-llm/tests/test_message_formatter.py
+uv run pytest lazygit-llm/tests/test_message_formatter.py -q
 ```
 
 ### テストカバレッジ
