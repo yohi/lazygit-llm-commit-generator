@@ -253,7 +253,7 @@ cp lazygit-llm/config/config.yml.example ~/.config/lazygit-llm/config.yml
 
 #### 2. APIキー認証エラー
 
-```
+```text
 ❌ 認証エラー: APIキーを確認してください
 ```
 
@@ -419,7 +419,7 @@ cp team-configs/config-standard.yml ~/.config/lazygit-llm/config.yml
 ```bash
 # プロジェクトを更新
 cd lazygit-llm-commit-generator
-git pull origin main
+git pull origin master
 
 # 再インストール
 python3 install.py
