@@ -1,16 +1,16 @@
-# 🚀 LazyGit LLM Commit Generator
+# LazyGit LLM Commit Generator
 
 LazyGitと連携してLLM（Large Language Model）でコミットメッセージを自動生成するPythonツールです。
 
-## ✨ 主な機能
+## 主な機能
 
-- **🔧 LazyGit統合**: LazyGitのカスタムコマンドとして組み込み可能
-- **🤖 マルチLLM対応**: OpenAI GPT、Anthropic Claude、Google Gemini、Claude Codeに対応
-- **🔒 セキュアな認証**: API認証と環境変数による安全な管理
-- **⚙️ 柔軟な設定**: YAML設定ファイルによる詳細なカスタマイズ
-- **🛡️ 堅牢性**: 包括的なエラーハンドリングとログ出力
+- **LazyGit統合**: LazyGitのカスタムコマンドとして組み込み可能
+- **マルチLLM対応**: OpenAI GPT、Anthropic Claude、Google Gemini、Claude Codeに対応
+- **セキュアな認証**: API認証と環境変数による安全な管理
+- **柔軟な設定**: YAML設定ファイルによる詳細なカスタマイズ
+- **堅牢性**: 包括的なエラーハンドリングとログ出力
 
-## 🎯 対応プロバイダー
+## 対応プロバイダー
 
 ### API型プロバイダー
 - **OpenAI**: GPT-4, GPT-3.5-turbo
@@ -21,7 +21,7 @@ LazyGitと連携してLLM（Large Language Model）でコミットメッセー�
 - **Google Gemini CLI**: gcloud CLIを通じたGemini利用
 - **Claude Code**: claude-code CLIを通じたClaude利用
 
-## 🚀 クイックスタート
+## クイックスタート
 
 ### 1. インストール
 
@@ -70,7 +70,7 @@ customCommands:
 3. FilesセクションでCtrl+Gを押下
 4. 生成されたコミットメッセージを確認・編集
 
-## 📋 システム要件
+## システム要件
 
 - **Python**: 3.9以上（推奨: 3.11+）
 - **Git**: 2.0以上
@@ -83,7 +83,7 @@ customCommands:
 - `google-generativeai` - Google Gemini API利用
 - `PyYAML` - 設定ファイル処理
 
-## ⚙️ 設定
+## 設定
 
 ### 基本設定例
 
@@ -147,7 +147,7 @@ prompt_template: |
   - Wrap lines at 72 characters
 ```
 
-## 🔧 コマンドライン使用
+## コマンドライン使用
 
 ### 基本的な使用法
 
@@ -165,7 +165,7 @@ lazygit-llm-generate --verbose
 lazygit-llm-generate --test-config
 ```
 
-## 🛡️ セキュリティ機能
+## セキュリティ機能
 
 ### API認証の安全性
 - 設定ファイルには平文でAPIキーを保存しない
@@ -182,7 +182,7 @@ lazygit-llm-generate --test-config
 - 入力パラメータの厳密な検証
 - 詳細なログ記録とエラーハンドリング
 
-## 🛠 トラブルシューティング
+## トラブルシューティング
 
 ### よくある問題
 
@@ -238,7 +238,7 @@ tail -f /tmp/lazygit-llm-*.log
 lazygit-llm-generate --test-config
 ```
 
-## ⚡ パフォーマンス
+## パフォーマンス
 
 ### 高速化設定
 
@@ -257,7 +257,7 @@ additional_params:
 - プロバイダーごとの利用制限を確認
 - 200回/時間程度の利用を推奨
 
-## 🔧 開発
+## 開発
 
 ### 開発環境構築
 
@@ -280,38 +280,38 @@ mypy lazygit-llm/
 3. テスト作成
 4. ドキュメント更新
 
-## 📚 ドキュメント
+## ドキュメント
 
-- **[📖 ユーザーガイド](docs/USER_GUIDE.md)** - 詳細な使用方法とトラブルシューティング
-- **[📋 API仕様書](docs/API_REFERENCE.md)** - 全クラス・メソッドの詳細仕様
-- **[🛠 開発者ガイド](docs/DEVELOPMENT.md)** - 開発環境構築と拡張方法
-- **[📚 ドキュメント索引](docs/README_DOCS.md)** - 全ドキュメントの概要
+- **[ユーザーガイド](docs/USER_GUIDE.md)** - 詳細な使用方法とトラブルシューティング
+- **[API仕様書](docs/API_REFERENCE.md)** - 全クラス・メソッドの詳細仕様
+- **[開発者ガイド](docs/DEVELOPMENT.md)** - 開発環境構築と拡張方法
+- **[ドキュメント索引](docs/README_DOCS.md)** - 全ドキュメントの概要
 
-## 📄 ライセンス
+## ライセンス
 
 MIT License - 詳細は[LICENSE](LICENSE)ファイルを参照
 
-## 🔗 関連リンク
+## 関連リンク
 
 - [LazyGit](https://github.com/jesseduffield/lazygit) - 高機能Git UIツール
 - [OpenAI](https://openai.com/) - GPT API
 - [Anthropic](https://www.anthropic.com/) - Claude API
 - [Google](https://ai.google.dev/) - Gemini API
 
-## 🤝 コントリビューション
+## コントリビューション
 
 - **Issues**: GitHubのIssuesで不具合報告や機能要望
 - **Discussions**: 一般的な質問や議論
 - **Wiki**: 詳細なドキュメントと情報
 
-## 🎯 ロードマップ
+## ロードマップ
 
-- [ ] 🌐 Webインターフェース版の開発
-- [ ] 📱 モバイルアプリ対応
-- [ ] 🔄 自動コミット機能
-- [ ] 📊 使用統計とレポート機能
-- [ ] 🎨 カスタムテーマ対応
+- [ ] Webインターフェース版の開発
+- [ ] モバイルアプリ対応
+- [ ] 自動コミット機能
+- [ ] 使用統計とレポート機能
+- [ ] カスタムテーマ対応
 
 ---
 
-**Happy coding with AI-powered commit messages! 🚀✨**
+**Happy coding with AI-powered commit messages!**
