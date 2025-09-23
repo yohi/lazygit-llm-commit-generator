@@ -103,7 +103,7 @@ additional_params:
 ```yaml
 provider: "gemini-api"
 model_name: "gemini-1.5-pro"
-api_key: "${GEMINI_API_KEY}"
+api_key: "${GOOGLE_API_KEY}"
 additional_params:
   safety_settings:
     - category: "HARM_CATEGORY_DANGEROUS_CONTENT"
@@ -256,7 +256,7 @@ API認証には環境変数の使用を推奨：
 ```bash
 export OPENAI_API_KEY="sk-..."
 export ANTHROPIC_API_KEY="sk-ant-..."
-export GEMINI_API_KEY="AI..."
+export GOOGLE_API_KEY="AI..."
 ```
 
 ## CLIインターフェース

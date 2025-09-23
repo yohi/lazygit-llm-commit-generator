@@ -29,7 +29,7 @@ vi ~/.config/lazygit-llm/config.yml
 # 使用するLLMサービスのAPIキーを設定
 export OPENAI_API_KEY="sk-..."        # OpenAI使用時
 export ANTHROPIC_API_KEY="sk-ant-..."  # Claude使用時
-export GEMINI_API_KEY="AI..."          # Gemini使用時
+export GOOGLE_API_KEY="AI..."          # Gemini使用時
 ```
 
 ### 4. LazyGit統合
@@ -112,7 +112,7 @@ additional_params:
 ```yaml
 provider: "gemini-api"
 model_name: "gemini-1.5-pro"  # 推奨
-api_key: "${GEMINI_API_KEY}"
+api_key: "${GOOGLE_API_KEY}"
 additional_params:
   safety_settings:
     - category: "HARM_CATEGORY_DANGEROUS_CONTENT"
