@@ -1,11 +1,12 @@
 """
-設定管理システム
+設定管理モジュール
 
-YAML設定ファイルの読み込み、環境変数解決、設定検証を担当。
+YAML設定ファイルの読み込み、検証、環境変数展開を行う。
 セキュリティ要件に従いAPIキーの安全な管理を実装。
 """
 
 import os
+import re
 import yaml
 import logging
 from typing import Dict, Any, Optional, Union
@@ -90,11 +91,14 @@ class ConfigManager:
             with open(config_file, 'r', encoding='utf-8') as f:
                 raw_config = yaml.safe_load(f)
 
-            if not raw_config:
-                raise ConfigError("設定ファイルが空です")
+            # ルートは辞書である必要がある(空ファイルなどは {} とみなす)
+            if raw_config is None:
+                raw_config = {}
+            elif not isinstance(raw_config, dict):
+                raise ConfigError("設定ファイルのルートは辞書である必要があります")
 
             # 環境変数を解決
-            self.config = self._resolve_environment_variables(raw_config)
+            self.config = self._expand_environment_variables(raw_config)
 
             # 設定を検証
             if not self.validate_config():
@@ -178,14 +182,14 @@ class ConfigManager:
             # デフォルトのプロンプトテンプレートを提供
             template = (
                 "Based on the following git diff, generate a concise commit message "
-                "that follows conventional commits format:\n\n{diff}\n\n"
+                "that follows conventional commits format:\n\n$diff\n\n"
                 "Generate only the commit message, no additional text."
             )
             logger.warning("プロンプトテンプレートが設定されていません。デフォルトを使用します。")
 
-        # {diff}プレースホルダーが含まれているかチェック
-        if '{diff}' not in template:
-            raise ConfigError("プロンプトテンプレートに{diff}プレースホルダーが含まれていません")
+        # $diffプレースホルダーが含まれているかチェック
+        if '$diff' not in template:
+            raise ConfigError("プロンプトテンプレートに$diffプレースホルダーが含まれていません")
 
         return template
 
@@ -284,34 +288,33 @@ class ConfigManager:
             logger.error(f"設定検証中にエラー: {e}")
             return False
 
-    def _resolve_environment_variables(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def _expand_environment_variables(self, config: Any) -> Any:
         """
-        設定内の環境変数参照（${VAR_NAME}形式）を解決
+        設定内の環境変数を再帰的に展開する
 
         Args:
-            config: 元の設定辞書
+            config: 設定の一部 (dict, list, strなど)
 
         Returns:
-            環境変数が解決された設定辞書
+            環境変数が展開された設定
         """
-        resolved_config = {}
-
-        for key, value in config.items():
-            if isinstance(value, str) and value.startswith('${') and value.endswith('}'):
-                # 環境変数参照を解決
-                env_var_name = value[2:-1]  # ${} を除去
-                env_value = os.getenv(env_var_name)
-
-                if env_value is None:
-                    logger.warning(f"環境変数が見つかりません: {env_var_name}")
-                    resolved_config[key] = value  # 解決できない場合は元の値を保持
-                else:
-                    resolved_config[key] = env_value
-                    logger.debug(f"環境変数を解決: {env_var_name}")
-            else:
-                resolved_config[key] = value
-
-        return resolved_config
+        if isinstance(config, dict):
+            return {
+                key: self._expand_environment_variables(value)
+                for key, value in config.items()
+            }
+        elif isinstance(config, list):
+            return [self._expand_environment_variables(item) for item in config]
+        elif isinstance(config, str):
+            # ${VAR} または ${VAR:default} を文字列中の任意位置で展開
+            pattern = re.compile(r'\${([^}:]+)(?::([^}]*))?}')
+            def repl(m: re.Match) -> str:
+                key = m.group(1)
+                default = m.group(2)
+                return os.environ.get(key, default if default is not None else m.group(0))
+            return pattern.sub(repl, config)
+        else:
+            return config
 
     def _check_file_permissions(self, config_file: Path) -> None:
         """

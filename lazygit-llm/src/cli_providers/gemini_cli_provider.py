@@ -6,11 +6,11 @@ Google Cloud SDK (gcloud) を使用してGemini モデルにアクセスする�
 """
 
 import subprocess
-import shlex
 import logging
 import time
 import os
 import hashlib
+import shutil
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 
@@ -105,18 +105,20 @@ class GeminiCLIProvider(BaseProvider):
 
             return response
 
+        except (AuthenticationError, TimeoutError, ResponseError, ProviderError):
+            raise
         except Exception as e:
-            logger.error(f"Gemini CLI呼び出し中にエラー: {e}")
+            logger.exception("Gemini CLI呼び出し中にエラー")
             # エラーの分類
             error_str = str(e).lower()
             if any(keyword in error_str for keyword in ['authentication', 'login', 'credentials']):
-                raise AuthenticationError(f"gcloud認証エラー: {e}")
+                raise AuthenticationError("gcloud認証エラー") from e
             elif 'timeout' in error_str:
-                raise TimeoutError(f"Gemini CLIタイムアウト: {e}")
+                raise TimeoutError("Gemini CLIタイムアウト") from e
             elif any(keyword in error_str for keyword in ['not found', 'command not found']):
-                raise ProviderError(f"gcloudコマンドが見つかりません: {e}")
+                raise ProviderError("gcloudコマンドが見つかりません") from e
             else:
-                raise ProviderError(f"Gemini CLI呼び出しに失敗しました: {e}")
+                raise ProviderError("Gemini CLI呼び出しに失敗しました") from e
 
     def test_connection(self) -> bool:
         """
@@ -197,20 +199,9 @@ class GeminiCLIProvider(BaseProvider):
 
         # 明示的なパスで見つからない場合、PATHを検索
         if not gcloud_path:
-            try:
-                result = subprocess.run(
-                    ['which', 'gcloud'],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                    check=False
-                )
-                if result.returncode == 0 and result.stdout.strip():
-                    candidate_path = result.stdout.strip()
-                    if os.access(candidate_path, os.X_OK):
-                        gcloud_path = candidate_path
-            except Exception as e:
-                logger.debug(f"PATH検索中にエラー: {e}")
+            candidate = shutil.which('gcloud')
+            if candidate and os.access(candidate, os.X_OK):
+                gcloud_path = candidate
 
         if not gcloud_path:
             raise ProviderError(
@@ -244,10 +235,15 @@ class GeminiCLIProvider(BaseProvider):
                 raise ProviderError(f"バイナリに実行権限がありません: {binary_path}")
 
             # パスの正規化（シンボリックリンクの解決）
-            resolved_path = str(Path(binary_path).resolve())
+            resolved = Path(binary_path).resolve()
+            resolved_path = str(resolved)
+
+            # 許可バイナリ名の確認
+            if os.path.basename(resolved_path) not in self.ALLOWED_BINARIES:
+                raise ProviderError(f"許可されていないバイナリ名です: {resolved_path}")
 
             # 危険なパスのチェック
-            dangerous_patterns = ['/tmp/', '/var/tmp/', '..']
+            dangerous_patterns = ['/tmp/', '/var/tmp/']
             for pattern in dangerous_patterns:
                 if pattern in resolved_path:
                     raise ProviderError(f"危険なパスが検出されました: {resolved_path}")
@@ -372,7 +368,8 @@ class GeminiCLIProvider(BaseProvider):
         sanitized = input_text.strip()
 
         # 危険な文字の除去
-        dangerous_chars = ['`', '$', '\\', '|', '&', ';', '(', ')', '<', '>']
+        # シェル未使用のため制御文字に限定
+        dangerous_chars = ['\x00']
         for char in dangerous_chars:
             sanitized = sanitized.replace(char, '')
 
@@ -399,13 +396,21 @@ class GeminiCLIProvider(BaseProvider):
             'GOOGLE_APPLICATION_CREDENTIALS',
             'CLOUDSDK_CORE_PROJECT',
             'CLOUDSDK_COMPUTE_REGION',
-            'CLOUDSDK_COMPUTE_ZONE'
+            'CLOUDSDK_COMPUTE_ZONE',
+            'LANG',
+            'LC_ALL',
+            'NO_COLOR'
         ]
 
         safe_env = {}
         for var in safe_vars:
             if var in os.environ:
-                safe_env[var] = os.environ[var]
+                if var in ('LANG', 'LC_ALL'):
+                    safe_env[var] = os.environ.get(var, 'C.UTF-8')
+                elif var == 'NO_COLOR':
+                    safe_env[var] = '1'
+                else:
+                    safe_env[var] = os.environ[var]
 
         # セキュリティのため、明示的にシェル関連の環境変数を除去
         excluded_vars = ['SHELL', 'PS1', 'PS2']

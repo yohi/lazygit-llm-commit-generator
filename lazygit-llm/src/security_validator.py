@@ -11,7 +11,7 @@ import logging
 import os
 import stat
 import threading
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List, Tuple, ClassVar
 from pathlib import Path
 from dataclasses import dataclass
 from functools import lru_cache
@@ -38,41 +38,38 @@ class SecurityValidator:
     """
 
     # APIキーのパターン定義
-    API_KEY_PATTERNS = {
+    API_KEY_PATTERNS: ClassVar[Dict[str, Dict[str, Any]]] = {
         'openai': {
-            'pattern': r'^sk-[A-Za-z0-9]{48}$',
-            'min_length': 51,
-            'max_length': 51,
+            'pattern': r'^sk-[A-Za-z0-9_-]{20,}$',
+            'min_length': 24,
+            'max_length': 200,
             'description': 'OpenAI API key (sk-...)'
         },
         'anthropic': {
-            'pattern': r'^sk-ant-[A-Za-z0-9\-_]{95,}$',
-            'min_length': 100,
+            'pattern': r'^sk-ant-[A-Za-z0-9\-_]{20,}$',
+            'min_length': 24,
             'max_length': 200,
             'description': 'Anthropic API key (sk-ant-...)'
         },
         'gemini': {
-            'pattern': r'^AIza[A-Za-z0-9\-_]{35}$',
-            'min_length': 39,
-            'max_length': 39,
+            'pattern': r'^AIza[A-Za-z0-9\-_]{34,36}$',
+            'min_length': 38,
+            'max_length': 40,
             'description': 'Google API key (AIza...)'
         }
     }
 
     # 危険な文字パターン
-    DANGEROUS_PATTERNS = [
-        r'[`$\\|&;()<>]',  # シェルインジェクション
-        r'[{}[\]]',        # コードインジェクション
-        r'["\']',          # クォートインジェクション
-        r'[\x00-\x1f]',    # 制御文字
-        r'\.\./',          # パストラバーサル
-        r'<script',        # XSS
-        r'javascript:',    # JavaScript URI
-        r'data:',          # Data URI
+    DANGEROUS_PATTERNS: ClassVar[List[str]] = [
+        r'\.\./',                                  # パストラバーサル
+        r'(?i)\bjavascript:',                      # JS URI
+        r'(?i)\bdata:(?:text|application)/\w+',    # Data URI(限定)
+        r'(?is)<script\b[^>]*>.*?</script>',       # 明示的な script タグ
+        r'[\x00-\x08\x0B\x0C\x0E-\x1F]',           # 制御文字(改行/タブ除外)
     ]
 
     # 機密情報パターン
-    SENSITIVE_PATTERNS = [
+    SENSITIVE_PATTERNS: ClassVar[List[str]] = [
         r'(?i)(password|passwd|pwd)\s*[:=]\s*[\'"]?([^\s\'"]{8,})',
         r'(?i)(secret|token|key)\s*[:=]\s*[\'"]?([^\s\'"]{16,})',
         r'(?i)(api[_-]?key)\s*[:=]\s*[\'"]?([^\s\'"]{20,})',
@@ -170,7 +167,7 @@ class SecurityValidator:
 
         # APIキーハッシュを生成（ログ用、元のキーは記録しない）
         key_hash = hashlib.sha256(api_key.encode()).hexdigest()[:8]
-        logger.info(f"APIキー検証成功: provider={provider}, hash={key_hash}")
+        logger.debug(f"APIキー検証成功: provider={provider}, hash={key_hash}")
 
         return SecurityCheckResult(
             is_valid=True,
@@ -197,17 +194,18 @@ class SecurityValidator:
                 recommendations=[]
             )
 
-        original_size = len(diff_content)
+        original_size = len(diff_content.encode("utf-8"))
 
         # サイズ制限チェック
         if original_size > self.max_diff_size:
-            diff_content = diff_content[:self.max_diff_size]
-            logger.warning(f"差分サイズが制限を超過、切り詰めました: {original_size} -> {len(diff_content)}")
+            truncated = diff_content.encode("utf-8")[: self.max_diff_size]
+            diff_content = truncated.decode("utf-8", errors="ignore")
+            logger.warning(
+                f"差分サイズが制限を超過、切り詰めました: {original_size} -> {len(diff_content.encode('utf-8'))} bytes"
+            )
 
-        # 機密情報の検出
-        sensitive_check = self._detect_sensitive_content(diff_content)
-        if not sensitive_check.is_valid:
-            return "", sensitive_check
+        # 機密情報の検出とマスキング
+        diff_content, sensitive_check = self._redact_sensitive_content(diff_content)
 
         # 危険なパターンの検出と除去
         sanitized_diff, danger_check = self._remove_dangerous_patterns(diff_content)
@@ -221,11 +219,29 @@ class SecurityValidator:
                 recommendations=[]
             )
 
+        # 最も深刻なレベルを選択
+        final_level = "safe"
+        all_recommendations = []
+
+        if sensitive_check.level == "warning":
+            final_level = "warning"
+            all_recommendations.extend(sensitive_check.recommendations)
+
+        if danger_check.level in ["warning", "danger"]:
+            if final_level == "safe" or danger_check.level == "danger":
+                final_level = danger_check.level
+            all_recommendations.extend(danger_check.recommendations)
+
+        messages = []
+        if sensitive_check.level == "warning":
+            messages.append(sensitive_check.message)
+        messages.append(f"差分のサニタイゼーション完了 ({len(sanitized_diff)}文字)")
+
         final_check_result = SecurityCheckResult(
             is_valid=True,
-            level=danger_check.level,
-            message=f"差分のサニタイゼーション完了 ({len(sanitized_diff)}文字)",
-            recommendations=danger_check.recommendations
+            level=final_level,
+            message=" / ".join(messages),
+            recommendations=list(set(all_recommendations))  # 重複除去
         )
 
         logger.debug(f"Git差分サニタイゼーション完了: {original_size} -> {len(sanitized_diff)} 文字")
@@ -289,8 +305,8 @@ class SecurityValidator:
                     ]
                 )
 
-        except Exception as e:
-            logger.error(f"ファイル権限チェックエラー: {e}")
+        except (OSError, PermissionError, FileNotFoundError):
+            logger.exception("ファイル権限チェックエラー")
             return SecurityCheckResult(
                 is_valid=False,
                 level="warning",
@@ -367,7 +383,6 @@ class SecurityValidator:
         has_upper = any(c.isupper() for c in api_key)
         has_lower = any(c.islower() for c in api_key)
         has_digit = any(c.isdigit() for c in api_key)
-        has_special = any(c in '-_' for c in api_key)
 
         if not (has_upper and has_lower and has_digit):
             issues.append("文字種の多様性が不足")
@@ -397,6 +412,50 @@ class SecurityValidator:
             message="APIキーの強度は適切です",
             recommendations=[]
         )
+
+    def _redact_sensitive_content(self, content: str) -> Tuple[str, SecurityCheckResult]:
+        """
+        機密情報の検出とマスキング
+
+        Args:
+            content: チェック対象のコンテンツ
+
+        Returns:
+            (マスキング済みコンテンツ, セキュリティチェック結果)
+        """
+        detected_patterns = []
+        masked_content = content
+
+        for pattern in self.SENSITIVE_PATTERNS:
+            matches = list(re.finditer(pattern, masked_content))
+            if matches:
+                detected_patterns.append("機密情報らしきパターン")
+                # 機密情報をマスキング
+                for match in reversed(matches):  # 後ろから置換して位置がずれないように
+                    masked_content = (
+                        masked_content[:match.start()] +
+                        "[REDACTED]" +
+                        masked_content[match.end():]
+                    )
+
+        if detected_patterns:
+            return masked_content, SecurityCheckResult(
+                is_valid=True,  # 継続処理可能
+                level="warning",  # dangerからwarningに変更
+                message="機密情報らしきパターンをマスキングしました",
+                recommendations=[
+                    "マスキング前の内容にパスワードやAPIキーが含まれていないか確認してください",
+                    "機密情報をコミットしないでください",
+                    ".gitignore で機密ファイルを除外してください"
+                ]
+            )
+        else:
+            return content, SecurityCheckResult(
+                is_valid=True,
+                level="safe",
+                message="機密情報は検出されませんでした",
+                recommendations=[]
+            )
 
     def _detect_sensitive_content(self, content: str) -> SecurityCheckResult:
         """
@@ -444,7 +503,6 @@ class SecurityValidator:
         Returns:
             (クリーンなコンテンツ, セキュリティチェック結果)
         """
-        original_content = content
         removed_patterns = []
 
         # 危険なパターンを順次除去

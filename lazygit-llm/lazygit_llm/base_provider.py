@@ -6,10 +6,12 @@ API型とCLI型の両方に対応する抽象基底クラス。
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Dict, Any
+from string import Template
 import logging
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 class BaseProvider(ABC):
@@ -40,8 +42,9 @@ class BaseProvider(ABC):
 
         Raises:
             ProviderError: プロバイダー固有のエラー
-            TimeoutError: タイムアウトエラー
+            ProviderTimeoutError: タイムアウトエラー
             AuthenticationError: 認証エラー
+            ResponseError: レスポンス検証エラー
         """
         pass
 
@@ -76,6 +79,20 @@ class BaseProvider(ABC):
             if field not in self.config:
                 logger.error(f"必須設定項目が不足: {field}")
                 return False
+            val = self.config.get(field)
+            if isinstance(val, str) and val.strip() == "":
+                logger.error(f"必須設定項目が空文字: {field}")
+                return False
+        # 数値系の基本検証
+        for num_field in ("timeout", "max_tokens", "max_message_length"):
+            if num_field in self.config:
+                try:
+                    v = int(self.config[num_field])
+                    if v <= 0:
+                        raise ValueError
+                except (TypeError, ValueError):
+                    logger.exception(f"数値設定が不正: {num_field}={self.config[num_field]!r}")
+                    return False
         return True
 
     @abstractmethod
@@ -94,12 +111,18 @@ class BaseProvider(ABC):
 
         Args:
             diff: Git差分
-            prompt_template: プロンプトテンプレート（{diff}プレースホルダーを含む）
+            prompt_template: プロンプトテンプレート ($diff プレースホルダーを含む)
 
         Returns:
             フォーマット済みプロンプト
         """
-        return prompt_template.format(diff=diff)
+        # 後方互換: 旧 `{diff}` を `$diff` に正規化
+        if "{diff}" in prompt_template:
+            prompt_template = prompt_template.replace("{diff}", "$diff")
+        tmpl = Template(prompt_template)
+        if "$diff" not in prompt_template:
+            logger.warning("プロンプトテンプレートに `$diff` が見つかりません。diff を埋め込まずに送信します。")
+        return tmpl.safe_substitute(diff=diff)
 
     def _validate_response(self, response: str) -> bool:
         """
@@ -114,8 +137,13 @@ class BaseProvider(ABC):
         if not response or not response.strip():
             return False
 
-        # 最大長チェック（LazyGitでの表示を考慮）
-        if len(response) > 500:
+        # 最大長チェック(LazyGitでの表示を考慮)
+        try:
+            max_len = int(self.config.get("max_message_length", 500))
+        except (TypeError, ValueError):
+            logger.warning("max_message_length が不正です。既定値 500 を使用します。")
+            max_len = 500
+        if len(response) > max_len:
             logger.warning("生成されたコミットメッセージが長すぎます")
             return False
 
@@ -132,7 +160,7 @@ class AuthenticationError(ProviderError):
     pass
 
 
-class TimeoutError(ProviderError):
+class ProviderTimeoutError(ProviderError):
     """タイムアウトエラー"""
     pass
 

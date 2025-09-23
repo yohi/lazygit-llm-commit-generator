@@ -15,6 +15,9 @@ eggs/
 .eggs/
 lib/
 lib64/
+pip-wheel-metadata/
+build/lib/
+build/lib64/
 parts/
 sdist/
 var/
@@ -79,6 +82,8 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+.envrc
 .venv
 env/
 venv/
@@ -106,6 +111,10 @@ dmypy.json
 
 # pytype static type analyzer
 .pytype/
+
+# Ruff / Pyright
+.ruff_cache/
+.pyrightcache/
 
 # Cython debug symbols
 cython_debug/
@@ -190,8 +199,12 @@ yarn-debug.log*
 yarn-error.log*
 .npm
 .yarn-integrity
+.pnpm-store/
+.turbo/
+.parcel-cache/
 
 # Local development
 local/
 dev/
 development/
+.serena/
