@@ -87,7 +87,9 @@ class ErrorHandler:
 
         logger.error(f"エラーを処理中: {error_type} - {self._sanitize_message(error_message)}")
         if context:
-            logger.error(f"コンテキスト: {context}")
+            # contextを安全に文字列化してからサニタイズ
+            sanitized_context = self._sanitize_message(str(context) if context is not None else "")
+            logger.error(f"コンテキスト: {sanitized_context}")
 
         # エラータイプに基づく分類
         error_info = self._classify_error(error, error_message, context)
@@ -536,7 +538,6 @@ class ErrorHandler:
         logger.log(
             level,
             f"[{error_info.category.value}] {sanitized}",
-            exc_info=original_error if self.verbose else None,
         )
 
         if error_info.technical_details:
