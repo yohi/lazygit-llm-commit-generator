@@ -572,13 +572,8 @@ class SecurityValidator:
 
         return False
 
-    def get_security_recommendations(self) -> List[str]:
-        """
-        一般的なセキュリティ推奨事項を取得
+    # (重複定義は削除。末尾の定義を採用)
 
-        Returns:
-            セキュリティ推奨事項のリスト
-        """
     @staticmethod
     def _cached_validate_api_key(provider: str, key_length: int) -> SecurityCheckResult:
         """
@@ -690,18 +685,13 @@ class SecurityValidator:
                 recommendations=["設定ファイルでAPIキーを設定してください"]
             )
 
-        # キャッシュ使用の判定
+        # キャッシュ使用の判定（ただし実際の検証は必ず実行）
         if self.enable_caching and len(api_key) > 20:
-            api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
-            try:
-                with self._cache_lock:
-                    self._processing_stats['cache_hits'] += 1
-                return self._cached_validate_api_key(provider, len(api_key))
-            except Exception:
-                with self._cache_lock:
-                    self._processing_stats['cache_misses'] += 1
+            # 早期判定にキャッシュ統計のみ利用（判定自体は必ずフル検証へ）
+            with self._cache_lock:
+                self._processing_stats['cache_hits'] += 1
 
-        # 通常の検証処理
+        # 通常の検証処理（必ず実行）
         with self._cache_lock:
             self._processing_stats['api_key_validations'] += 1
 

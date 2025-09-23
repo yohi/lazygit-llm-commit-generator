@@ -185,7 +185,7 @@ index 0000000..1234567
 
         # 危険な差分の検出
         dangerous_diff = "diff --git a/test.py b/test.py\n+os.system('rm -rf /')"
-        sanitized_dangerous, danger_result = validator.sanitize_git_diff(dangerous_diff)
+        _, danger_result = validator.sanitize_git_diff(dangerous_diff)
 
         assert not danger_result.is_valid
         assert danger_result.level == "danger"

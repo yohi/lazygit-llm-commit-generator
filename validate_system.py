@@ -19,6 +19,7 @@ from unittest.mock import Mock, patch
 # プロジェクトパスを追加
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(project_root / "lazygit-llm"))
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ class SystemValidator:
         """
         self.verbose = verbose
         self.project_root = project_root
-        self.src_dir = self.project_root / "lazygit-llm" / "lazygit_llm"
+        self.src_dir = self.project_root / "lazygit-llm" / "src"
         self.config_dir = self.project_root / "config"
 
         # ログ設定
@@ -122,17 +123,17 @@ class SystemValidator:
         """プロジェクト構造を確認"""
         required_paths = [
             "lazygit-llm/",
-            "lazygit-llm/lazygit_llm/",
-            "lazygit-llm/lazygit_llm/main.py",
-            "lazygit-llm/lazygit_llm/base_provider.py",
-            "lazygit-llm/lazygit_llm/config_manager.py",
+            "lazygit-llm/src/",
+            "lazygit-llm/main.py",
+            "lazygit-llm/src/base_provider.py",
+            "lazygit-llm/src/config_manager.py",
             "lazygit-llm/lazygit_llm/git_processor.py",
-            "lazygit-llm/lazygit_llm/provider_factory.py",
+            "lazygit-llm/src/provider_factory.py",
             "lazygit-llm/src/security_validator.py",
             "lazygit-llm/src/error_handler.py",
-            "lazygit-llm/lazygit_llm/message_formatter.py",
-            "lazygit-llm/lazygit_llm/api_providers/",
-            "lazygit-llm/lazygit_llm/cli_providers/",
+            "lazygit-llm/src/message_formatter.py",
+            "lazygit-llm/src/api_providers/",
+            "lazygit-llm/src/cli_providers/",
             "config/",
             "docs/",
             "requirements.txt",
@@ -154,19 +155,19 @@ class SystemValidator:
     def validate_python_modules(self) -> Tuple[bool, str]:
         """Pythonモジュールのインポートテスト"""
         modules_to_test = [
-            ("lazygit_llm.main", "メインエントリーポイント"),
-            ("lazygit_llm.base_provider", "プロバイダー基底クラス"),
-            ("lazygit_llm.config_manager", "設定管理"),
+            ("main", "メインエントリーポイント"),
+            ("src.base_provider", "プロバイダー基底クラス"),
+            ("src.config_manager", "設定管理"),
             ("lazygit_llm.git_processor", "Git差分処理"),
-            ("lazygit_llm.provider_factory", "プロバイダーファクトリ"),
-            ("lazygit_llm.src.security_validator", "セキュリティ検証"),
-            ("lazygit_llm.src.error_handler", "エラーハンドリング"),
-            ("lazygit_llm.message_formatter", "メッセージフォーマット"),
-            ("lazygit_llm.api_providers.openai_provider", "OpenAIプロバイダー"),
-            ("lazygit_llm.api_providers.anthropic_provider", "Anthropicプロバイダー"),
-            ("lazygit_llm.api_providers.gemini_api_provider", "Gemini APIプロバイダー"),
-            ("lazygit_llm.cli_providers.gemini_cli_provider", "Gemini CLIプロバイダー"),
-            ("lazygit_llm.cli_providers.claude_code_provider", "Claude Codeプロバイダー"),
+            ("src.provider_factory", "プロバイダーファクトリ"),
+            ("src.security_validator", "セキュリティ検証"),
+            ("src.error_handler", "エラーハンドリング"),
+            ("src.message_formatter", "メッセージフォーマット"),
+            ("src.api_providers.openai_provider", "OpenAIプロバイダー"),
+            ("src.api_providers.anthropic_provider", "Anthropicプロバイダー"),
+            ("src.api_providers.gemini_api_provider", "Gemini APIプロバイダー"),
+            ("src.cli_providers.gemini_cli_provider", "Gemini CLIプロバイダー"),
+            ("src.cli_providers.claude_code_provider", "Claude Codeプロバイダー"),
         ]
 
         failed_imports = []
@@ -215,13 +216,13 @@ class SystemValidator:
         """コアクラスの基本機能確認"""
         try:
             # BaseProviderの確認
-            from lazygit_llm.base_provider import BaseProvider, ProviderError
+            from src.base_provider import BaseProvider, ProviderError
             assert hasattr(BaseProvider, 'generate_commit_message')
             assert hasattr(BaseProvider, 'test_connection')
             assert hasattr(BaseProvider, 'supports_streaming')
 
             # ConfigManagerの確認
-            from lazygit_llm.config_manager import ConfigManager, ConfigError
+            from src.config_manager import ConfigManager, ConfigError
             config_manager = ConfigManager()
             assert hasattr(config_manager, 'load_config')
             assert hasattr(config_manager, 'validate_config')
@@ -240,7 +241,7 @@ class SystemValidator:
     def validate_provider_factory(self) -> Tuple[bool, str]:
         """プロバイダーファクトリの確認"""
         try:
-            from lazygit_llm.provider_factory import ProviderFactory, provider_registry
+            from src.provider_factory import ProviderFactory, provider_registry
 
             factory = ProviderFactory()
             available_providers = factory.get_available_providers()
@@ -263,7 +264,7 @@ class SystemValidator:
     def validate_security_features(self) -> Tuple[bool, str]:
         """セキュリティ機能の確認"""
         try:
-            from lazygit_llm.src.security_validator import SecurityValidator, SecurityCheckResult
+            from src.security_validator import SecurityValidator, SecurityCheckResult
 
             validator = SecurityValidator()
 
@@ -338,8 +339,8 @@ index 0000000..ed708ec
     def validate_error_handling(self) -> Tuple[bool, str]:
         """エラーハンドリングの確認"""
         try:
-            from lazygit_llm.src.error_handler import ErrorHandler, ErrorInfo
-            from lazygit_llm.base_provider import ProviderError
+            from src.error_handler import ErrorHandler, ErrorInfo
+            from src.base_provider import ProviderError
 
             error_handler = ErrorHandler(verbose=self.verbose)
 
@@ -347,7 +348,7 @@ index 0000000..ed708ec
             test_error = ProviderError("API authentication failed")
             error_info = error_handler.handle_error(test_error, {"provider": "openai"})
 
-            from lazygit_llm.src.error_handler import ErrorCategory
+            from src.error_handler import ErrorCategory
             if error_info.category != ErrorCategory.AUTHENTICATION:
                 return False, f"エラー分類が不正確（期待: AUTHENTICATION, 実際: {error_info.category}）"
 
@@ -364,7 +365,7 @@ index 0000000..ed708ec
     def validate_message_formatting(self) -> Tuple[bool, str]:
         """メッセージフォーマットの確認"""
         try:
-            from lazygit_llm.message_formatter import MessageFormatter
+            from src.message_formatter import MessageFormatter
 
             formatter = MessageFormatter()
 
@@ -391,7 +392,7 @@ index 0000000..ed708ec
     def validate_config_management(self) -> Tuple[bool, str]:
         """設定管理の確認"""
         try:
-            from lazygit_llm.config_manager import ConfigManager
+            from src.config_manager import ConfigManager
 
             # テスト用設定ファイル作成
             test_config = {
@@ -480,9 +481,9 @@ index 0000000..ed708ec
     def validate_execution_integration(self) -> Tuple[bool, str]:
         """実行統合テスト（モック使用）"""
         try:
-            from lazygit_llm.main import main
-            from lazygit_llm.config_manager import ConfigManager
-            from lazygit_llm.provider_factory import ProviderFactory
+            from main import main
+            from src.config_manager import ConfigManager
+            from src.provider_factory import ProviderFactory
 
             # テスト用設定
             test_config = {
@@ -505,7 +506,7 @@ index 0000000..ed708ec
                     # モックを使用してエンドツーエンドテスト
                     with patch('sys.stdin') as mock_stdin, \
                          patch('sys.argv', ['main.py', '--config', f.name, '--test-config']), \
-                         patch('lazygit_llm.api_providers.openai_provider.OpenAIProvider.generate_commit_message') as mock_generate:
+                         patch('src.api_providers.openai_provider.OpenAIProvider.generate_commit_message') as mock_generate:
 
                         mock_stdin.read.return_value = test_diff
                         mock_generate.return_value = "feat: add new feature"

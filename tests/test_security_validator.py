@@ -168,7 +168,7 @@ class TestSecurityValidator:
  safe_code = "normal operation"
 """
 
-        sanitized, result = self.validator.sanitize_git_diff(dangerous_diff)
+        _, result = self.validator.sanitize_git_diff(dangerous_diff)
 
         assert result.is_valid is False  # 危険なパターンで無効
         assert result.level == "danger"
@@ -188,7 +188,7 @@ class TestSecurityValidator:
         """大容量コンテンツのテスト"""
         large_diff = "+" + "a" * 200000  # 200KB
 
-        sanitized, result = self.validator.sanitize_git_diff(large_diff)
+        _, result = self.validator.sanitize_git_diff(large_diff)
 
         assert result.is_valid is False
         assert result.level == "warning"
@@ -309,9 +309,9 @@ db_password="another_secret"
     def test_sanitize_sensitive_info_api_keys(self):
         """APIキー情報のサニタイゼーション"""
         text_with_keys = """
-api_key = "sk-1234567890abcdef"
-OPENAI_API_KEY=sk-proj-abcdef1234567890
-google_api_key: AIza1234567890abcdef
+api_key = "sk-1234567890abcdef"  # gitleaks:allow - test only
+OPENAI_API_KEY=sk-proj-abcdef1234567890  # gitleaks:allow - test only
+google_api_key: AIza1234567890abcdef  # gitleaks:allow - test only
 """
         sanitized = self.validator._sanitize_sensitive_info(text_with_keys)
 

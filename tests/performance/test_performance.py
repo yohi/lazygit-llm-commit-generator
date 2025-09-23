@@ -122,9 +122,9 @@ index 0000000..1234567
 
         # APIキー検証のパフォーマンス
         api_keys = [
-            "sk-1234567890abcdef1234567890abcdef12345678",
-            "sk-ant-api03-" + "a" * 95,
-            "AIza" + "a" * 35,
+            "sk-1234567890abcdef1234567890abcdef12345678",  # gitleaks:allow - test only
+            "sk-ant-api03-" + "a" * 95,  # gitleaks:allow - test only
+            "AIza" + "a" * 35,  # gitleaks:allow - test only
         ]
 
         for api_key in api_keys:
