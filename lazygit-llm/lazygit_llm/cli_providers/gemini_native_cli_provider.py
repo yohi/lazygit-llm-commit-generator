@@ -170,15 +170,16 @@ class GeminiNativeCLIProvider(BaseProvider):
         if timeout is None:
             timeout = self.cli_timeout
 
-        # コマンド構築（-pオプションでプロンプトを指定）
-        cmd = [self.gemini_path, '-p', prompt]
+        # コマンド構築（stdinでプロンプトを渡す）
+        cmd = [self.gemini_path, '-p', '-']  # '-'でstdinを意味する
 
         try:
-            logger.debug("Geminiコマンド実行: %s", ' '.join(cmd[:2]) + ' [prompt]')
+            logger.debug("Geminiコマンド実行: %s", ' '.join(cmd))
 
-            # セキュアなsubprocess実行
+            # セキュアなsubprocess実行（stdin経由でプロンプト送信）
             result = subprocess.run(
                 cmd,
+                input=prompt,
                 capture_output=True,
                 text=True,
                 timeout=timeout,

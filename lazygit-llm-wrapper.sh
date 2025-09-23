@@ -2,7 +2,8 @@
 # LazyGit LLM Commit Generator Wrapper
 # LazyGitから呼び出されるラッパースクリプト
 
-set -e
+set -euo pipefail
+IFS=$'\n\t'
 
 # 元の作業ディレクトリを保存（これがgitリポジトリ）
 REPO_DIR="$(pwd)"
@@ -28,4 +29,9 @@ echo "Staged changes detected, generating commit message..." >&2
 
 # LazyGit LLMコマンドを実行（元のディレクトリで）
 cd "$REPO_DIR"
-(cd "$SCRIPT_DIR" && uv run lazygit-llm-generate --config "/home/y_ohi/.config/lazygit-llm/config.yml")
+if ! command -v uv >/dev/null 2>&1; then
+  echo "uv not found. Please install uv." >&2
+  exit 1
+fi
+CONFIG_PATH="${LAZYGIT_LLM_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/lazygit-llm/config.yml}"
+(cd "$SCRIPT_DIR" && uv run lazygit-llm-generate --config "$CONFIG_PATH")

@@ -33,33 +33,31 @@ class ProviderFactory:
             ValueError: 不正な設定
             RuntimeError: プロバイダーの作成に失敗
         """
-        provider_config = config.get('provider', {})
+        config_dict = dict(config)
+        provider_section = config_dict.get('provider', {})
 
         # プロバイダー設定が文字列の場合（後方互換性のため）
-        if isinstance(provider_config, str):
-            provider_name = provider_config.strip()
+        if isinstance(provider_section, str):
+            provider_name = provider_section.strip()
             # プロバイダー名から種類を推測
             if provider_name.endswith('-cli') or provider_name in ['claude-code', 'gemini-native']:
                 provider_type = 'cli'
             else:
                 provider_type = 'api'
-            # 文字列設定の場合、全体設定をコピーしてプロバイダー情報を追加
-            provider_config = dict(config)
-            provider_config['provider'] = {'name': provider_name, 'type': provider_type}
-        elif isinstance(provider_config, Mapping):
-            # provider 実装は dict を前提とする可能性があるため実体化
-            provider_config = dict(provider_config)
-            provider_name = str(provider_config.get('name', '')).strip()
+            # 文字列設定の場合、providerセクションを書き換え
+            config_dict['provider'] = {'name': provider_name, 'type': provider_type}
+        elif isinstance(provider_section, Mapping):
+            provider_name = str(provider_section.get('name', '')).strip()
             if not provider_name:
                 raise ValueError("provider.name が設定されていません")
-            provider_type = str(provider_config.get('type', '')).strip().lower()
+            provider_type = str(provider_section.get('type', '')).strip().lower()
         else:
             raise TypeError("provider設定が文字列またはマッピングではありません")
         provider_class = None
 
         if not provider_type:
             # type 未指定時は設定から自動判別を試行
-            detected_type = self._detect_provider_type(provider_config)
+            detected_type = self._detect_provider_type(config_dict)
             if detected_type:
                 provider_type = detected_type
                 logger.info("設定から自動判別したプロバイダータイプ: %s", provider_type)
@@ -112,7 +110,7 @@ class ProviderFactory:
 
         # プロバイダーインスタンスを作成
         try:
-            provider = provider_class(provider_config)
+            provider = provider_class(config_dict)
             logger.info("プロバイダーを作成しました: %s (%s)", provider_name, provider_type)
             return provider
         except Exception as e:

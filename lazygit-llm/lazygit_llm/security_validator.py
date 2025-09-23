@@ -630,14 +630,14 @@ class SecurityValidator:
             return "truncated", SecurityCheckResult(
                 is_valid=True,
                 level="warning",
-                message=f"差分サイズが制限を超過、切り詰めました",
+                message="差分サイズが制限を超過、切り詰めました",
                 recommendations=["大きなファイルの変更は分割することを検討してください"]
             )
 
         return "clean", SecurityCheckResult(
             is_valid=True,
             level="safe",
-            message=f"差分のサニタイゼーション完了",
+            message="差分のサニタイゼーション完了",
             recommendations=[]
         )
 
@@ -723,9 +723,8 @@ class SecurityValidator:
 
         # 中程度の差分はキャッシュを使用
         if diff_size < 50000 and self.enable_caching:
-            diff_hash = hashlib.sha256(diff_content.encode('utf-8')).hexdigest()
             try:
-                cached_status, cached_result = self._cached_sanitize_diff(diff_size, self.max_diff_size)
+                cached_status, _cached_result = self._cached_sanitize_diff(diff_size, self.max_diff_size)
                 with self._cache_lock:
                     self._processing_stats['cache_hits'] += 1
 

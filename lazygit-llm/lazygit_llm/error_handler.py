@@ -14,7 +14,7 @@ from typing import Dict, Any, Optional, List, Union
 from enum import Enum
 from dataclasses import dataclass
 
-from .base_provider import ProviderError, AuthenticationError, TimeoutError, ResponseError
+from .base_provider import ProviderError, AuthenticationError, TimeoutError, ResponseError, ProviderTimeoutError
 from .config_manager import ConfigError
 
 logger = logging.getLogger(__name__)
@@ -231,7 +231,7 @@ class ErrorHandler:
                 exit_code=1
             )
 
-    def handle_provider_error(self, error: Union[ProviderError, AuthenticationError, TimeoutError, ResponseError]) -> ErrorInfo:
+    def handle_provider_error(self, error: Union[ProviderError, AuthenticationError, TimeoutError, ProviderTimeoutError, ResponseError]) -> ErrorInfo:
         """
         プロバイダーエラーを処理
 
@@ -254,7 +254,7 @@ class ErrorHandler:
                 exit_code=3
             )
 
-        elif isinstance(error, TimeoutError):
+        elif isinstance(error, (TimeoutError, ProviderTimeoutError)):
             return ErrorInfo(
                 category=ErrorCategory.NETWORK,
                 severity=ErrorSeverity.MEDIUM,
@@ -434,7 +434,7 @@ class ErrorHandler:
         # 特定のエラータイプの処理
         if isinstance(error, ConfigError):
             return self.handle_config_error(error)
-        elif isinstance(error, (ProviderError, AuthenticationError, TimeoutError, ResponseError)):
+        elif isinstance(error, (ProviderError, AuthenticationError, TimeoutError, ProviderTimeoutError, ResponseError)):
             return self.handle_provider_error(error)
         elif isinstance(error, (ImportError, PermissionError)):
             return self.handle_system_error(error)
@@ -539,6 +539,9 @@ class ErrorHandler:
             level,
             f"[{error_info.category.value}] {sanitized}",
         )
+
+        # 例外型のみを安全に出力（メッセージ本文は別途サニタイズ済み）
+        logger.debug("original_error_type=%s", type(original_error).__name__)
 
         if error_info.technical_details:
             logger.debug(f"技術的詳細: {self._sanitize_message(error_info.technical_details)}")

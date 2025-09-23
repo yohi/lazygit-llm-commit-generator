@@ -295,9 +295,9 @@ class GeminiCLIProvider(BaseProvider):
         if self.project_id:
             cmd_args.extend([f'--project={self.project_id}'])
 
-        # リージョンが設定されている場合は追加
+        # ロケーションが設定されている場合は追加
         if self.location:
-            cmd_args.extend([f'--region={self.location}'])
+            cmd_args.extend([f'--location={self.location}'])
 
         # 安全な環境変数の設定
         safe_env = self._create_safe_environment()
