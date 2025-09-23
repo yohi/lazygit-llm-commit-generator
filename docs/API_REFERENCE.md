@@ -8,7 +8,7 @@ LazyGit LLM Commit Generatorは、複数のLLMプロバイダーに対応した�
 
 ### プロバイダーシステム
 
-```
+```text
 BaseProvider (ABC)
 ├── API Providers
 │   ├── OpenAIProvider    # OpenAI GPT API
@@ -193,7 +193,7 @@ LLMレスポンスの整形とクリーンアップを担当。
 
 ### 例外階層
 
-```
+```text
 Exception
 └── ProviderError (基底例外)
     ├── AuthenticationError  # 認証エラー
@@ -348,19 +348,19 @@ class CustomProvider(BaseProvider):
 ### よくある問題
 
 #### 1. 認証エラー
-```
+```text
 ❌ 認証エラー: APIキーを確認してください
 ```
 **解決方法**: 環境変数のAPIキーを確認
 
 #### 2. タイムアウト
-```
+```text
 ❌ タイムアウト: ネットワーク接続を確認してください
 ```
 **解決方法**: ネットワーク接続とtimeout設定を確認
 
 #### 3. プロバイダーエラー
-```
+```text
 ❌ プロバイダーエラー: 利用制限に達しました
 ```
 **解決方法**: APIの利用制限とクレジット残高を確認

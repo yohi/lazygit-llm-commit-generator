@@ -1,1 +1,3 @@
-*.md text
+*.md text diff=markdown
+# 任意: 改行コードを統一したい場合
+# *.md text eol=lf

@@ -41,7 +41,7 @@ cp .vscode/settings.json.example .vscode/settings.json
 
 ## 📁 プロジェクト構造
 
-```
+```text
 lazygit-llm-commit-generator/
 ├── 📦 setup.py                    # パッケージ設定
 ├── 📄 requirements.txt            # 依存関係
@@ -75,10 +75,10 @@ lazygit-llm-commit-generator/
 │       ├── unit/                 # 単体テスト
 │       ├── integration/          # 統合テスト
 │       └── performance/          # パフォーマンステスト
-└── 🚀 scripts/                   # ユーティリティスクリプト
-    ├── install.py                # インストールスクリプト
-    ├── validate_system.py        # システム検証
-    └── test_packaging.sh         # パッケージングテスト
+├── 🚀 install.py                 # インストールスクリプト
+├── 📋 validate_system.py         # システム検証
+├── 🧪 test_packaging.sh          # パッケージングテスト
+└── 🔧 verify_packaging.py        # パッケージング検証
 ```
 
 ## 🎯 開発フロー
@@ -98,9 +98,9 @@ git checkout -b feature/new-provider
 python -m pytest tests/
 
 # コード品質チェック
-black lazygit-llm/
-flake8 lazygit-llm/
-mypy lazygit-llm/
+black lazygit-llm/lazygit_llm/
+flake8 lazygit-llm/lazygit_llm/
+mypy lazygit-llm/lazygit_llm/
 
 # コミット・プッシュ
 git add .
@@ -273,7 +273,7 @@ class TestNewProvider:
 
 ### テスト構造
 
-```
+```text
 tests/
 ├── unit/                     # 単体テスト
 │   ├── test_config_manager.py

@@ -240,7 +240,7 @@ lazygit-llm-generate --config ~/.config/lazygit-llm/config-work.yml
 
 #### 1. 設定ファイルが見つからない
 
-```
+```text
 ❌ 設定ファイルが見つかりません: config/config.yml
 ```
 
@@ -271,7 +271,7 @@ echo 'export OPENAI_API_KEY="sk-..."' >> ~/.bashrc
 
 #### 3. Pythonモジュールエラー
 
-```
+```text
 ModuleNotFoundError: No module named 'openai'
 ```
 
@@ -300,7 +300,7 @@ ls -la ~/.local/bin/lazygit-llm-generate
 
 #### 5. タイムアウトエラー
 
-```
+```text
 ❌ タイムアウト: ネットワーク接続を確認してください
 ```
 
@@ -312,7 +312,7 @@ timeout: 60  # 60秒に延長
 
 #### 6. レート制限エラー
 
-```
+```text
 ❌ プロバイダーエラー: 利用制限に達しました
 ```
 
