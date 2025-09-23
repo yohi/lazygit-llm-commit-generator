@@ -18,7 +18,7 @@ from unittest.mock import Mock, patch
 
 # プロジェクトパスを追加
 project_root = Path(__file__).parent
-sys.path.insert(0, str(project_root / "lazygit-llm"))
+sys.path.insert(0, str(project_root))
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class SystemValidator:
         """
         self.verbose = verbose
         self.project_root = project_root
-        self.src_dir = self.project_root / "lazygit-llm" / "src"
+        self.src_dir = self.project_root / "lazygit_llm" / "src"
         self.config_dir = self.project_root / "config"
 
         # ログ設定
@@ -121,18 +121,18 @@ class SystemValidator:
     def validate_project_structure(self) -> Tuple[bool, str]:
         """プロジェクト構造を確認"""
         required_paths = [
-            "lazygit-llm/",
-            "lazygit-llm/src/",
-            "lazygit-llm/src/main.py",
-            "lazygit-llm/src/base_provider.py",
-            "lazygit-llm/src/config_manager.py",
-            "lazygit-llm/src/git_processor.py",
-            "lazygit-llm/src/provider_factory.py",
-            "lazygit-llm/src/security_validator.py",
-            "lazygit-llm/src/error_handler.py",
-            "lazygit-llm/src/message_formatter.py",
-            "lazygit-llm/src/api_providers/",
-            "lazygit-llm/src/cli_providers/",
+            "lazygit_llm/",
+            "lazygit_llm/src/",
+            "lazygit_llm/src/main.py",
+            "lazygit_llm/src/base_provider.py",
+            "lazygit_llm/src/config_manager.py",
+            "lazygit_llm/src/git_processor.py",
+            "lazygit_llm/src/provider_factory.py",
+            "lazygit_llm/src/security_validator.py",
+            "lazygit_llm/src/error_handler.py",
+            "lazygit_llm/src/message_formatter.py",
+            "lazygit_llm/src/api_providers/",
+            "lazygit_llm/src/cli_providers/",
             "config/",
             "docs/",
             "requirements.txt",
@@ -154,19 +154,19 @@ class SystemValidator:
     def validate_python_modules(self) -> Tuple[bool, str]:
         """Pythonモジュールのインポートテスト"""
         modules_to_test = [
-            ("src.main", "メインエントリーポイント"),
-            ("src.base_provider", "プロバイダー基底クラス"),
-            ("src.config_manager", "設定管理"),
-            ("src.git_processor", "Git差分処理"),
-            ("src.provider_factory", "プロバイダーファクトリ"),
-            ("src.security_validator", "セキュリティ検証"),
-            ("src.error_handler", "エラーハンドリング"),
-            ("src.message_formatter", "メッセージフォーマット"),
-            ("src.api_providers.openai_provider", "OpenAIプロバイダー"),
-            ("src.api_providers.anthropic_provider", "Anthropicプロバイダー"),
-            ("src.api_providers.gemini_api_provider", "Gemini APIプロバイダー"),
-            ("src.cli_providers.gemini_cli_provider", "Gemini CLIプロバイダー"),
-            ("src.cli_providers.claude_code_provider", "Claude Codeプロバイダー"),
+            ("lazygit_llm.main", "メインエントリーポイント"),
+            ("lazygit_llm.src.base_provider", "プロバイダー基底クラス"),
+            ("lazygit_llm.src.config_manager", "設定管理"),
+            ("lazygit_llm.src.git_processor", "Git差分処理"),
+            ("lazygit_llm.src.provider_factory", "プロバイダーファクトリ"),
+            ("lazygit_llm.src.security_validator", "セキュリティ検証"),
+            ("lazygit_llm.src.error_handler", "エラーハンドリング"),
+            ("lazygit_llm.src.message_formatter", "メッセージフォーマット"),
+            ("lazygit_llm.src.api_providers.openai_provider", "OpenAIプロバイダー"),
+            ("lazygit_llm.src.api_providers.anthropic_provider", "Anthropicプロバイダー"),
+            ("lazygit_llm.src.api_providers.gemini_api_provider", "Gemini APIプロバイダー"),
+            ("lazygit_llm.src.cli_providers.gemini_cli_provider", "Gemini CLIプロバイダー"),
+            ("lazygit_llm.src.cli_providers.claude_code_provider", "Claude Codeプロバイダー"),
         ]
 
         failed_imports = []
@@ -480,9 +480,9 @@ index 0000000..ed708ec
     def validate_execution_integration(self) -> Tuple[bool, str]:
         """実行統合テスト（モック使用）"""
         try:
-            from src.main import main
-            from src.config_manager import ConfigManager
-            from src.provider_factory import ProviderFactory
+            from lazygit_llm.main import main
+            from lazygit_llm.src.config_manager import ConfigManager
+            from lazygit_llm.src.provider_factory import ProviderFactory
 
             # テスト用設定
             test_config = {
@@ -505,7 +505,7 @@ index 0000000..ed708ec
                     # モックを使用してエンドツーエンドテスト
                     with patch('sys.stdin') as mock_stdin, \
                          patch('sys.argv', ['main.py', '--config', f.name, '--test-config']), \
-                         patch('src.api_providers.openai_provider.OpenAIProvider.generate_commit_message') as mock_generate:
+                         patch('lazygit_llm.src.api_providers.openai_provider.OpenAIProvider.generate_commit_message') as mock_generate:
 
                         mock_stdin.read.return_value = test_diff
                         mock_generate.return_value = "feat: add new feature"

@@ -63,7 +63,7 @@ class TestEndToEnd:
         config_file = self.create_test_config()
 
         # テスト用Git差分
-        test_diff = """diff --git a/src/auth.py b/src/auth.py
+        test_diff = r'''diff --git a/src/auth.py b/src/auth.py
 new file mode 100644
 index 0000000..1234567
 --- /dev/null
@@ -78,7 +78,7 @@ index 0000000..1234567
 +    if not username or not password:
 +        return False
 +    return True
-"""
+'''
 
         # コマンドライン引数をシミュレート
         test_args = ['main.py', '--config', config_file]
@@ -260,7 +260,7 @@ index 0000000..1234567
 
     def test_unicode_content_pipeline(self):
         """Unicode コンテンツパイプラインテスト"""
-        unicode_diff = """diff --git a/japanese.py b/japanese.py
+        unicode_diff = r'''diff --git a/japanese.py b/japanese.py
 new file mode 100644
 index 0000000..1234567
 --- /dev/null
@@ -272,7 +272,7 @@ index 0000000..1234567
 +
 +def こんにちは():
 +    print("こんにちは、世界！ 🌍")
-"""
+'''
 
         # Git差分処理
         processor = GitDiffProcessor()

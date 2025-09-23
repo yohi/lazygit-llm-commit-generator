@@ -139,7 +139,7 @@ if __name__ == "__main__":
 
     def test_stdin_input_processing(self):
         """標準入力からの差分処理テスト（LazyGitからの入力をシミュレート）"""
-        sample_diff = """diff --git a/src/auth.py b/src/auth.py
+        sample_diff = r'''diff --git a/src/auth.py b/src/auth.py
 new file mode 100644
 index 0000000..1234567
 --- /dev/null
@@ -160,7 +160,7 @@ index 0000000..1234567
 +def get_user_permissions(user_id):
 +    """ユーザーの権限を取得"""
 +    return ['read', 'write']
-"""
+'''
 
         processor = GitDiffProcessor()
 

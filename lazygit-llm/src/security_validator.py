@@ -742,9 +742,12 @@ class SecurityValidator:
                     self._processing_stats['cache_hits'] += 1
 
                 if cached_status == "clean":
-                    return diff_content, cached_result
+                    sanitized_content, sanitized_result = self.sanitize_git_diff(diff_content)
+                    return sanitized_content, sanitized_result
                 elif cached_status == "truncated":
-                    return diff_content[:self.max_diff_size], cached_result
+                    truncated = diff_content[:self.max_diff_size]
+                    sanitized_content, sanitized_result = self.sanitize_git_diff(truncated)
+                    return sanitized_content, sanitized_result
             except Exception:
                 with self._cache_lock:
                     self._processing_stats['cache_misses'] += 1

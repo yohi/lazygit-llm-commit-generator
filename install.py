@@ -179,9 +179,16 @@ class Installer:
         """インストールされたパッケージを確認"""
         required_packages = ['openai', 'anthropic', 'google-generativeai', 'PyYAML']
 
+        import importlib
+        name_map = {
+            'google-generativeai': 'google.generativeai',
+            'PyYAML': 'yaml',
+        }
+
         for package in required_packages:
             try:
-                __import__(package.replace('-', '_'))
+                module_name = name_map.get(package, package.replace('-', '_'))
+                importlib.import_module(module_name)
                 print(f"   ✅ {package}")
             except ImportError:
                 print(f"   ⚠️ {package} のインポートに失敗（オプショナル）")

@@ -14,7 +14,7 @@ import shutil
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
 from io import StringIO
-from functools import lru_cache
+from collections import OrderedDict
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
@@ -61,12 +61,23 @@ class GitDiffProcessor:
         self.max_diff_size = max_diff_size
         self.enable_parallel_processing = enable_parallel_processing
         self._cached_diff_data: Optional[DiffData] = None
-        self._processing_cache: Dict[str, Any] = {}
+        self._processing_cache: "OrderedDict[str, str]" = OrderedDict()
         self._cache_lock = threading.Lock()
+        self._cache_maxsize = 128
         self.security_validator = SecurityValidator()
 
-        # 並行処理用のThreadPoolExecutor
-        self._executor = ThreadPoolExecutor(max_workers=2) if enable_parallel_processing else None
+        # 並行処理用のThreadPoolExecutor（オンデマンド作成）
+        self._executor = None
+
+    def _get_executor(self) -> Optional[ThreadPoolExecutor]:
+        """ThreadPoolExecutorを取得（必要時に作成）"""
+        if not self.enable_parallel_processing:
+            return None
+
+        with self._cache_lock:
+            if self._executor is None:
+                self._executor = ThreadPoolExecutor(max_workers=2)
+            return self._executor
 
     def read_staged_diff(self) -> str:
         """
@@ -498,10 +509,9 @@ class GitDiffProcessor:
         # 最低限の条件: diffヘッダーまたはファイルヘッダーが存在
         return has_file_header or has_diff_header
 
-    @lru_cache(maxsize=128)
     def _cached_format_diff(self, diff_hash: str, diff: str) -> str:
         """
-        LRUキャッシュを使用した差分フォーマット処理
+        自前LRUキャッシュを使用した差分フォーマット処理
 
         Args:
             diff_hash: 差分のハッシュ値（キャッシュキーとして使用）
@@ -510,7 +520,26 @@ class GitDiffProcessor:
         Returns:
             フォーマットされた差分
         """
-        return self._format_diff_internal(diff)
+        with self._cache_lock:
+            # キャッシュヒット確認
+            if diff_hash in self._processing_cache:
+                # LRU更新（最後に移動）
+                value = self._processing_cache.pop(diff_hash)
+                self._processing_cache[diff_hash] = value
+                return value
+
+            # キャッシュミス - 新しい値を計算
+            result = self._format_diff_internal(diff)
+
+            # キャッシュに保存
+            self._processing_cache[diff_hash] = result
+
+            # 容量制限チェック
+            if len(self._processing_cache) > self._cache_maxsize:
+                # 最古のエントリを削除
+                self._processing_cache.popitem(last=False)
+
+            return result
 
     def _format_diff_internal(self, diff: str) -> str:
         """
@@ -526,7 +555,8 @@ class GitDiffProcessor:
             return "No changes detected"
 
         # 並行処理が有効な場合は並行フォーマットを使用
-        if self.enable_parallel_processing and self._executor:
+        executor = self._get_executor()
+        if executor:
             return self._parallel_format_diff(diff)
         else:
             return self._sequential_format_diff(diff)
@@ -580,8 +610,9 @@ class GitDiffProcessor:
             return self._sequential_format_diff(diff)
 
         # 差分解析とフィルタリングを並行実行
-        future_parse = self._executor.submit(self._parse_diff, diff)
-        future_filter = self._executor.submit(self._filter_diff_content, diff)
+        executor = self._get_executor()
+        future_parse = executor.submit(self._parse_diff, diff)
+        future_filter = executor.submit(self._filter_diff_content, diff)
 
         try:
             # 結果を取得
@@ -621,7 +652,6 @@ class GitDiffProcessor:
         """
         with self._cache_lock:
             self._processing_cache.clear()
-            self._cached_format_diff.cache_clear()
         logger.debug("キャッシュをクリアしました")
 
     def get_cache_info(self) -> Dict[str, Any]:
@@ -631,14 +661,11 @@ class GitDiffProcessor:
         Returns:
             キャッシュ統計情報
         """
-        cache_info = self._cached_format_diff.cache_info()
-        return {
-            'cache_hits': cache_info.hits,
-            'cache_misses': cache_info.misses,
-            'cache_size': cache_info.currsize,
-            'cache_maxsize': cache_info.maxsize,
-            'processing_cache_size': len(self._processing_cache)
-        }
+        with self._cache_lock:
+            return {
+                'cache_size': len(self._processing_cache),
+                'cache_maxsize': self._cache_maxsize,
+            }
 
     def optimize_for_performance(self, diff: str) -> str:
         """
@@ -663,7 +690,7 @@ class GitDiffProcessor:
         # 中程度の差分はキャッシュを使用
         if diff_size < 50000:  # 50KB未満
             import hashlib
-            diff_hash = hashlib.md5(diff.encode('utf-8')).hexdigest()
+            diff_hash = hashlib.sha256(diff.encode('utf-8')).hexdigest()
             return self._cached_format_diff(diff_hash, diff)
 
         # 大きな差分は並行処理と切り詰めを使用

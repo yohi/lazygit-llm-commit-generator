@@ -24,7 +24,7 @@ class TestProviderCompatibility:
     def setup_method(self):
         """各テストメソッドの前に実行"""
         self.factory = ProviderFactory()
-        self.sample_diff = """diff --git a/src/utils.py b/src/utils.py
+        self.sample_diff = '''diff --git a/src/utils.py b/src/utils.py
 new file mode 100644
 index 0000000..1234567
 --- /dev/null
@@ -38,7 +38,7 @@ index 0000000..1234567
 +    \"\"\"Format timestamp to human readable string\"\"\"
 +    import datetime
 +    return datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
-"""
+'''
 
     def create_provider_config(self, provider_name, **kwargs):
         """プロバイダー設定を作成"""
