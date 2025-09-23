@@ -314,4 +314,4 @@ MIT License - 詳細は[LICENSE](LICENSE)ファイルを参照
 
 ---
 
-**Happy coding with AI-powered commit messages! 🚀✨**
+### Happy coding with AI-powered commit messages! 🚀✨
