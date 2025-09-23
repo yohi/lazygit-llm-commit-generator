@@ -20,7 +20,7 @@ python3 install.py
 cp lazygit-llm/config/config.yml.example ~/.config/lazygit-llm/config.yml
 
 # 設定を編集
-nano ~/.config/lazygit-llm/config.yml
+vi ~/.config/lazygit-llm/config.yml
 ```
 
 ### 3. 環境変数設定
