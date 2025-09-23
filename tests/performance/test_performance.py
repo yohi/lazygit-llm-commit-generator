@@ -187,13 +187,13 @@ additional_params:
         factory = ProviderFactory()
 
         providers_to_test = [
-            ('openai', 'lazygit_llm.src.api_providers.openai_provider.OpenAIProvider'),
-            ('anthropic', 'lazygit_llm.src.api_providers.anthropic_provider.AnthropicProvider'),
-            ('gemini-api', 'lazygit_llm.src.api_providers.gemini_api_provider.GeminiApiProvider'),
+            ('openai', 'src.api_providers.openai_provider.OpenAIProvider'),
+            ('anthropic', 'src.api_providers.anthropic_provider.AnthropicProvider'),
+            ('gemini-api', 'src.api_providers.gemini_api_provider.GeminiAPIProvider'),
         ]
 
         for provider_name, provider_class_path in providers_to_test:
-            from lazygit_llm.src.provider_factory import ProviderConfig
+            from lazygit_llm.provider_factory import ProviderConfig
 
             config = ProviderConfig(
                 name=provider_name,
