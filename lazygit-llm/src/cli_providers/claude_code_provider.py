@@ -6,11 +6,10 @@ Anthropic Claude Code CLI を使用してClaude モデルにアクセスする�
 """
 
 import subprocess
-import shlex
 import logging
 import time
 import os
-import json
+import shutil
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 
@@ -103,20 +102,22 @@ class ClaudeCodeProvider(BaseProvider):
 
             return response
 
+        except (AuthenticationError, TimeoutError, ResponseError, ProviderError):
+            raise
         except Exception as e:
-            logger.error(f"Claude Code CLI呼び出し中にエラー: {e}")
+            logger.exception("Claude Code CLI呼び出し中にエラー")
             # エラーの分類
             error_str = str(e).lower()
             if any(keyword in error_str for keyword in ['authentication', 'login', 'auth', 'unauthorized']):
-                raise AuthenticationError(f"Claude Code認証エラー: {e}")
+                raise AuthenticationError("Claude Code認証エラー") from e
             elif 'timeout' in error_str:
-                raise TimeoutError(f"Claude Code CLIタイムアウト: {e}")
+                raise TimeoutError("Claude Code CLIタイムアウト") from e
             elif any(keyword in error_str for keyword in ['not found', 'command not found']):
-                raise ProviderError(f"claude-codeコマンドが見つかりません: {e}")
+                raise ProviderError("claude-codeコマンドが見つかりません") from e
             elif any(keyword in error_str for keyword in ['rate limit', 'quota', 'limit exceeded']):
-                raise ProviderError(f"Claude Code APIレート制限: {e}")
+                raise ProviderError("Claude Code APIレート制限") from e
             else:
-                raise ProviderError(f"Claude Code CLI呼び出しに失敗しました: {e}")
+                raise ProviderError("Claude Code CLI呼び出しに失敗しました") from e
 
     def test_connection(self) -> bool:
         """
@@ -136,7 +137,7 @@ class ClaudeCodeProvider(BaseProvider):
             test_prompt = "Hello, this is a connection test. Please respond with just 'OK'."
             response = self._execute_claude_code_command(test_prompt, test_mode=True)
 
-            if response and response.strip():
+            if response and 'ok' in response.strip().lower():
                 logger.info("Claude Code CLI接続テスト成功")
                 return True
             else:
@@ -201,21 +202,10 @@ class ClaudeCodeProvider(BaseProvider):
         # 明示的なパスで見つからない場合、PATHを検索
         if not claude_code_path:
             for binary_name in binary_candidates:
-                try:
-                    result = subprocess.run(
-                        ['which', binary_name],
-                        capture_output=True,
-                        text=True,
-                        timeout=5,
-                        check=False
-                    )
-                    if result.returncode == 0 and result.stdout.strip():
-                        candidate_path = result.stdout.strip()
-                        if os.access(candidate_path, os.X_OK):
-                            claude_code_path = candidate_path
-                            break
-                except Exception as e:
-                    logger.debug(f"PATH検索中にエラー ({binary_name}): {e}")
+                candidate = shutil.which(binary_name)
+                if candidate and os.access(candidate, os.X_OK):
+                    claude_code_path = candidate
+                    break
 
         if not claude_code_path:
             raise ProviderError(
@@ -249,10 +239,15 @@ class ClaudeCodeProvider(BaseProvider):
                 raise ProviderError(f"バイナリに実行権限がありません: {binary_path}")
 
             # パスの正規化（シンボリックリンクの解決）
-            resolved_path = str(Path(binary_path).resolve())
+            resolved = Path(binary_path).resolve()
+            resolved_path = str(resolved)
+
+            # 許可バイナリ名の確認
+            if os.path.basename(resolved_path) not in self.ALLOWED_BINARIES:
+                raise ProviderError(f"許可されていないバイナリ名です: {resolved_path}")
 
             # 危険なパスのチェック
-            dangerous_patterns = ['/tmp/', '/var/tmp/', '..']
+            dangerous_patterns = ['/tmp/', '/var/tmp/']
             for pattern in dangerous_patterns:
                 if pattern in resolved_path:
                     raise ProviderError(f"危険なパスが検出されました: {resolved_path}")
@@ -298,8 +293,8 @@ class ClaudeCodeProvider(BaseProvider):
             if hasattr(self, 'max_output_tokens') and self.max_output_tokens:
                 cmd_args.extend(['--max-tokens', str(self.max_output_tokens)])
 
-        # プロンプトを最後に追加
-        cmd_args.append(sanitized_prompt)
+        # CLI仕様に応じてフラグを付けて渡す(要確認)
+        cmd_args.extend(['--prompt', sanitized_prompt])
 
         # 安全な環境変数の設定
         safe_env = self._create_safe_environment()
@@ -347,15 +342,15 @@ class ClaudeCodeProvider(BaseProvider):
 
             return response
 
-        except subprocess.TimeoutExpired:
-            logger.error(f"claude-codeコマンドがタイムアウトしました: {self.cli_timeout}秒")
-            raise TimeoutError(f"claude-codeコマンドがタイムアウトしました（{self.cli_timeout}秒）")
+        except subprocess.TimeoutExpired as e:
+            logger.exception("claude-codeコマンドがタイムアウトしました: %s 秒", self.cli_timeout)
+            raise TimeoutError("claude-codeコマンドがタイムアウトしました") from e
 
         except Exception as e:
             if isinstance(e, (AuthenticationError, TimeoutError, ProviderError)):
                 raise
-            logger.error(f"claude-codeコマンド実行中に予期しないエラー: {e}")
-            raise ProviderError(f"claude-codeコマンド実行に失敗しました: {e}")
+            logger.exception("claude-codeコマンド実行中に予期しないエラー")
+            raise ProviderError("claude-codeコマンド実行に失敗しました") from e
 
     def _sanitize_input(self, input_text: str) -> str:
         """
@@ -373,8 +368,8 @@ class ClaudeCodeProvider(BaseProvider):
         # 基本的なサニタイゼーション
         sanitized = input_text.strip()
 
-        # 危険な文字の除去（Claude Code CLIの場合、一部は許可）
-        dangerous_chars = ['`', '$', '\\', '|', '&', ';', '<', '>']
+        # シェル未使用のため制御文字に限定
+        dangerous_chars = ['\x00']
         for char in dangerous_chars:
             sanitized = sanitized.replace(char, '')
 
@@ -399,13 +394,21 @@ class ClaudeCodeProvider(BaseProvider):
             'HOME',
             'USER',
             'CLAUDE_API_KEY',
-            'ANTHROPIC_API_KEY'
+            'ANTHROPIC_API_KEY',
+            'LANG',
+            'LC_ALL',
+            'NO_COLOR'
         ]
 
         safe_env = {}
         for var in safe_vars:
             if var in os.environ:
-                safe_env[var] = os.environ[var]
+                if var in ('LANG', 'LC_ALL'):
+                    safe_env[var] = os.environ.get(var, 'C.UTF-8')
+                elif var == 'NO_COLOR':
+                    safe_env[var] = '1'
+                else:
+                    safe_env[var] = os.environ[var]
 
         # セキュリティのため、明示的にシェル関連の環境変数を除去
         excluded_vars = ['SHELL', 'PS1', 'PS2']

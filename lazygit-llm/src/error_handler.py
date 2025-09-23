@@ -1,3 +1,4 @@
+# ruff: noqa: RUF001, RUF002, RUF003
 """
 包括的エラーハンドリングシステム
 
@@ -6,6 +7,7 @@
 """
 
 import logging
+import re
 import sys
 import traceback
 from typing import Dict, Any, Optional, List, Union
@@ -67,7 +69,7 @@ class ErrorHandler:
             verbose: 詳細エラー情報を表示するかどうか
         """
         self.verbose = verbose
-        self._error_registry = self._build_error_registry()
+        self._error_registry = self._build_error_registry()  # TODO: カスタムエラーハンドラー登録機能で使用予定
 
     def handle_error(self, error: Exception, context: Optional[str] = None) -> ErrorInfo:
         """
@@ -83,9 +85,11 @@ class ErrorHandler:
         error_type = type(error).__name__
         error_message = str(error)
 
-        logger.error(f"エラーを処理中: {error_type} - {error_message}")
+        logger.error(f"エラーを処理中: {error_type} - {self._sanitize_message(error_message)}")
         if context:
-            logger.error(f"コンテキスト: {context}")
+            # contextを安全に文字列化してからサニタイズ
+            sanitized_context = self._sanitize_message(str(context) if context is not None else "")
+            logger.error(f"コンテキスト: {sanitized_context}")
 
         # エラータイプに基づく分類
         error_info = self._classify_error(error, error_message, context)
@@ -154,7 +158,7 @@ class ErrorHandler:
                     "設定ファイルの所有者が正しいか確認してください"
                 ],
                 recovery_possible=True,
-                exit_code=2
+                exit_code=10
             )
 
         else:
@@ -184,12 +188,12 @@ class ErrorHandler:
         """
         error_message = str(error)
 
-        if "No staged files found" in error_message:
+        if "no staged files found" in error_message.lower():
             return ErrorInfo(
                 category=ErrorCategory.GIT,
                 severity=ErrorSeverity.LOW,
                 message="ステージされたファイルがありません",
-                user_message="No staged files found",
+                user_message="ステージされたファイルがありません",
                 suggestions=[
                     "git add <files> でファイルをステージしてください",
                     "変更があるファイルを確認してください: git status"
@@ -238,7 +242,6 @@ class ErrorHandler:
             プロバイダーエラー情報
         """
         error_message = str(error)
-        error_type = type(error).__name__
 
         if isinstance(error, AuthenticationError):
             return ErrorInfo(
@@ -286,7 +289,7 @@ class ErrorHandler:
         else:  # ProviderError
             if "not found" in error_message.lower() or "見つかりません" in error_message:
                 return ErrorInfo(
-                    category=ErrorCategory.SYSTEM,
+                    category=ErrorCategory.CONFIGURATION,
                     severity=ErrorSeverity.HIGH,
                     message=f"プロバイダーセットアップエラー: {error_message}",
                     user_message="LLMプロバイダーのセットアップに問題があります",
@@ -295,7 +298,9 @@ class ErrorHandler:
                     exit_code=6
                 )
 
-            elif "rate limit" in error_message.lower() or "quota" in error_message.lower():
+            elif ("rate limit" in error_message.lower()
+                  or "quota" in error_message.lower()
+                  or "429" in error_message):
                 return ErrorInfo(
                     category=ErrorCategory.PROVIDER,
                     severity=ErrorSeverity.MEDIUM,
@@ -408,7 +413,7 @@ class ErrorHandler:
 
         # 技術的詳細の表示（verbose mode）
         if self.verbose and error_info.technical_details:
-            print(f"\n🔧 技術的詳細:\n{error_info.technical_details}", file=sys.stderr)
+            logger.debug(f"技術的詳細: {self._sanitize_message(error_info.technical_details)}")
 
         # 回復不可能なエラーの場合
         if not error_info.recovery_possible:
@@ -433,10 +438,13 @@ class ErrorHandler:
             return self.handle_provider_error(error)
         elif isinstance(error, (ImportError, PermissionError)):
             return self.handle_system_error(error)
-        elif "git" in error_message.lower() or "Git" in error_message:
-            return self.handle_git_error(error)
         else:
-            return self.handle_system_error(error)
+            # メッセージとコンテキスト双方を用いてGit関連を検出
+            blob = f"{error_message} {context or ''}".lower()
+            if "git" in blob:
+                return self.handle_git_error(error)
+            else:
+                return self.handle_system_error(error)
 
     def _get_auth_suggestions(self, error_message: str) -> List[str]:
         """認証エラー用の提案を生成"""
@@ -489,7 +497,32 @@ class ErrorHandler:
 
     def _get_technical_details(self, error: Exception) -> str:
         """技術的詳細を取得"""
-        return traceback.format_exc()
+        return "".join(traceback.TracebackException.from_exception(error).format())
+
+    def _sanitize_message(self, message: str) -> str:
+        """機密情報をマスクする"""
+        # APIキー、トークン等をマスク
+        patterns = [
+            # 汎用
+            (r'api[_-]?key[=:]\s*["\']?([^"\'\s]+)', r'api_key=***'),
+            (r'token[=:]\s*["\']?([^"\'\s]+)', r'token=***'),
+            (r'password[=:]\s*["\']?([^"\'\s]+)', r'password=***'),
+            # 環境変数系
+            (r'(OPENAI_API_KEY|ANTHROPIC_API_KEY|GOOGLE_API_KEY)\s*[:=]\s*["\']?([A-Za-z0-9_\-]+)', r'\1=***'),
+            # 代表的フォーマット
+            (r'(sk-[A-Za-z0-9]{16,})', r'***'),
+            (r'(ghp_[A-Za-z0-9]{20,})', r'***'),
+            (r'(xox[abpsr]-[A-Za-z0-9\-]{10,})', r'***'),
+            (r'(ya29\.[A-Za-z0-9\-_]+)', r'***'),
+            (r'(AIza[0-9A-Za-z\-_]{35})', r'***'),
+            # Bearer/JWT（簡易）
+            (r'Bearer\s+[A-Za-z0-9\-_\.]{20,}', r'Bearer ***'),
+            (r'\beyJ[A-Za-z0-9_\-]+=*\.[A-Za-z0-9_\-]+=*(?:\.[A-Za-z0-9_\-+=/]*)?', r'***'),
+        ]
+        sanitized = message
+        for pattern, replacement in patterns:
+            sanitized = re.sub(pattern, replacement, sanitized, flags=re.IGNORECASE)
+        return sanitized
 
     def _log_error(self, error_info: ErrorInfo, original_error: Exception) -> None:
         """エラーをログに記録"""
@@ -501,10 +534,14 @@ class ErrorHandler:
         }
 
         level = log_level.get(error_info.severity, logging.ERROR)
-        logger.log(level, f"[{error_info.category.value}] {error_info.message}")
+        sanitized = self._sanitize_message(error_info.message)
+        logger.log(
+            level,
+            f"[{error_info.category.value}] {sanitized}",
+        )
 
         if error_info.technical_details:
-            logger.debug(f"技術的詳細: {error_info.technical_details}")
+            logger.debug(f"技術的詳細: {self._sanitize_message(error_info.technical_details)}")
 
     def _build_error_registry(self) -> Dict[str, Any]:
         """エラーレジストリを構築（将来の拡張用）"""
@@ -524,5 +561,6 @@ class ErrorHandler:
         Returns:
             終了コード
         """
-        error_info = self.handle_error(error)
-        return error_info.exit_code
+        error_message = str(error)
+        classified = self._classify_error(error, error_message, context=None)
+        return classified.exit_code
