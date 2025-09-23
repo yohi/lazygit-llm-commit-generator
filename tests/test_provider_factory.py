@@ -397,7 +397,7 @@ class TestProviderFactory:
             name='openai',
             type='api',
             model='gpt-4-turbo',
-            api_key='sk-test1234567890abcdef1234567890abcdef12345678',
+            api_key='sk-test1234567890abcdef1234567890abcdef12345678',  # gitleaks:allow - test only
             timeout=45,
             max_tokens=500,
             prompt_template='Complex template with {diff} and additional context',

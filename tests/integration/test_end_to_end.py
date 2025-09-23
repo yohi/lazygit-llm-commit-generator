@@ -304,7 +304,11 @@ index 0000000..1234567
 
             provider_config = config_manager.get_provider_config()
 
-            with patch(f'lazygit_llm.src.api_providers.{provider_name}_provider.{provider_name.title()}Provider') as mock_provider_class:
+            class_name_map = {
+                'openai': 'OpenAIProvider',
+                'anthropic': 'AnthropicProvider',
+            }
+            with patch(f"lazygit_llm.src.api_providers.{provider_name}_provider.{class_name_map[provider_name]}") as mock_provider_class:
                 mock_provider = Mock()
                 mock_provider.supports_streaming.return_value = True
                 mock_provider_class.return_value = mock_provider

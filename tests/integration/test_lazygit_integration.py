@@ -30,8 +30,9 @@ class TestLazyGitIntegration:
     def teardown_method(self):
         """各テストメソッドの後に実行"""
         if self.test_repo_dir and os.path.exists(self.test_repo_dir):
-            # テスト用リポジトリを削除
-            subprocess.run(['rm', '-rf', self.test_repo_dir], check=False)
+            # テスト用リポジトリを削除（安全・移植性）
+            import shutil
+            shutil.rmtree(self.test_repo_dir, ignore_errors=True)
 
     def create_test_git_repo(self):
         """テスト用Gitリポジトリを作成"""

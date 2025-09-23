@@ -18,7 +18,7 @@ class TestGeminiApiProvider:
     def setup_method(self):
         """各テストメソッドの前に実行"""
         self.config = {
-            'api_key': 'AIza1234567890abcdef1234567890abcdef123',
+            'api_key': 'AIza1234567890abcdef1234567890abcdef123',  # gitleaks:allow - test only
             'model_name': 'gemini-1.5-pro',
             'timeout': 30,
             'max_tokens': 100,
@@ -34,7 +34,7 @@ class TestGeminiApiProvider:
         """正常初期化テスト"""
         provider = GeminiApiProvider(self.config)
 
-        assert provider.api_key == 'AIza1234567890abcdef1234567890abcdef123'
+        assert provider.api_key == 'AIza1234567890abcdef1234567890abcdef123'  # gitleaks:allow - test only
         assert provider.model_name == 'gemini-1.5-pro'
         assert provider.timeout == 30
         assert provider.max_tokens == 100

@@ -24,7 +24,7 @@ class TestProviderCompatibility:
     def setup_method(self):
         """各テストメソッドの前に実行"""
         self.factory = ProviderFactory()
-        self.sample_diff = '''diff --git a/src/utils.py b/src/utils.py
+        self.sample_diff = r'''diff --git a/src/utils.py b/src/utils.py
 new file mode 100644
 index 0000000..1234567
 --- /dev/null
@@ -35,7 +35,7 @@ index 0000000..1234567
 +"""
 +
 +def format_timestamp(timestamp):
-+    \"\"\"Format timestamp to human readable string\"\"\"
++    """Format timestamp to human readable string"""
 +    import datetime
 +    return datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
 '''
@@ -253,9 +253,12 @@ index 0000000..1234567
             # プロバイダーのパッケージパスを決定
             if provider_name in ['openai', 'anthropic', 'gemini-api']:
                 package_path = f'lazygit_llm.src.api_providers.{provider_name}_provider'
-                class_name = f'{provider_name.title()}Provider'
-                if provider_name == 'gemini-api':
-                    class_name = 'GeminiApiProvider'
+                class_map = {
+                    'openai': 'OpenAIProvider',
+                    'anthropic': 'AnthropicProvider',
+                    'gemini-api': 'GeminiApiProvider',
+                }
+                class_name = class_map[provider_name]
             else:
                 package_path = f'lazygit_llm.src.cli_providers.{provider_name.replace("-", "_")}_provider'
                 if provider_name == 'gemini-cli':
@@ -346,9 +349,12 @@ index 0000000..1234567
 
             # プロバイダーパッケージパスを決定
             package_path = f'lazygit_llm.src.api_providers.{provider_name}_provider'
-            class_name = f'{provider_name.title()}Provider'
-            if provider_name == 'gemini-api':
-                class_name = 'GeminiApiProvider'
+            class_map = {
+                'openai': 'OpenAIProvider',
+                'anthropic': 'AnthropicProvider',
+                'gemini-api': 'GeminiApiProvider',
+            }
+            class_name = class_map[provider_name]
 
             with patch(f'{package_path}.{class_name}') as mock_provider_class:
                 mock_provider = Mock()

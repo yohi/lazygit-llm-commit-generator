@@ -29,8 +29,8 @@ class TestSecurityValidator:
     def test_validate_api_key_openai_valid(self):
         """OpenAI APIキー有効性テスト"""
         valid_keys = [
-            "sk-1234567890abcdef1234567890abcdef12345678",
-            "sk-proj-1234567890abcdef1234567890abcdef1234567890abcdef",
+            "sk-1234567890abcdef1234567890abcdef12345678",  # gitleaks:allow - test only
+            "sk-proj-1234567890abcdef1234567890abcdef1234567890abcdef",  # gitleaks:allow - test only
         ]
 
         for key in valid_keys:
@@ -81,8 +81,8 @@ class TestSecurityValidator:
     def test_validate_api_key_google_valid(self):
         """Google APIキー有効性テスト"""
         valid_keys = [
-            "AIza" + "a" * 35,  # 39文字
-            "AIza1234567890abcdef1234567890abcdef123",
+            "AIza" + "a" * 35,  # 39文字  # gitleaks:allow - test only
+            "AIza1234567890abcdef1234567890abcdef123",  # gitleaks:allow - test only
         ]
 
         for key in valid_keys:
@@ -114,7 +114,7 @@ class TestSecurityValidator:
     def test_validate_api_key_exposed_warning(self):
         """露出の可能性があるAPIキーの警告テスト"""
         # 一般的でない文字列で、露出の可能性をテスト
-        suspicious_key = "sk-1234567890abcdef1234567890abcdef12345678"
+        suspicious_key = "sk-1234567890abcdef1234567890abcdef12345678"  # gitleaks:allow - test only
 
         result = self.validator.validate_api_key("openai", suspicious_key)
 
