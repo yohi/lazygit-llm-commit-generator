@@ -152,6 +152,44 @@ class GeminiNativeCLIProvider(BaseProvider):
         logger.debug("geminiバイナリを検証: %s", gemini_path)
         return gemini_path
 
+    def _sanitize_command_for_logging(self, cmd: list) -> str:
+        """
+        ログ出力用にコマンドラインを安全にサニタイズ
+        
+        Args:
+            cmd: コマンドライン引数のリスト
+            
+        Returns:
+            サニタイズされたコマンド文字列
+        """
+        if not cmd:
+            return ""
+        
+        sanitized = [cmd[0]]  # バイナリパスは保持
+        
+        for i, arg in enumerate(cmd[1:], 1):
+            if arg == '-p' and i + 1 < len(cmd):
+                # プロンプト引数をマスク
+                next_arg = cmd[i + 1] if i + 1 < len(cmd) else ""
+                if next_arg == '-':
+                    sanitized.extend(['-p', '-'])  # stdin経由は安全
+                elif len(next_arg) > 50:  # 長いプロンプトはマスク
+                    sanitized.extend(['-p', '[REDACTED_PROMPT]'])
+                else:
+                    # 短い引数は最初の20文字のみ表示
+                    sanitized.extend(['-p', f"{next_arg[:20]}..."])
+                break  # -p の次の引数も処理したのでスキップ
+            elif i > 1 and cmd[i-1] == '-p':
+                # 上記で処理済みなのでスキップ
+                continue
+            elif len(arg) > 100:
+                # 100文字以上の長い引数はマスク
+                sanitized.append('[LONG_ARGUMENT]')
+            else:
+                sanitized.append(arg)
+                
+        return ' '.join(sanitized)
+
     def _execute_gemini_command(self, prompt: str, timeout: Optional[int] = None) -> str:
         """
         geminiコマンドを安全に実行
@@ -183,7 +221,8 @@ class GeminiNativeCLIProvider(BaseProvider):
             cmd = [self.gemini_path, '-p', prompt]
 
         try:
-            logger.debug("Geminiコマンド実行: %s", ' '.join(cmd))
+            # 機密情報を含む可能性のあるコマンドをサニタイズしてログ出力
+            logger.debug("Geminiコマンド実行: %s", self._sanitize_command_for_logging(cmd))
 
             # セキュアなsubprocess実行
             if use_stdin:

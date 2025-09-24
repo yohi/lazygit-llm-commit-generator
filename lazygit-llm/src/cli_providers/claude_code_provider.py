@@ -43,21 +43,30 @@ class ClaudeCodeProvider(BaseProvider):
         Raises:
             ProviderError: claude-codeコマンドが利用できない場合
         """
+        # デフォルト値を設定してからsuper().__init__を呼び出し
+        config.setdefault('model_name', 'claude-3-5-sonnet-20241022')
+        config.setdefault('additional_params', {})
+        
         super().__init__(config)
 
         # 設定の検証
         if not self.validate_config():
             raise ProviderError("Claude Code CLI設定が無効です")
 
-        self.model = config.get('model_name', 'claude-3-5-sonnet-20241022')
+        self.model = config['model_name']
 
         # 追加設定
-        additional_params = config.get('additional_params', {})
+        additional_params = config['additional_params']
         self.temperature = additional_params.get('temperature', 0.3)
         self.max_output_tokens = additional_params.get('max_output_tokens', self.max_tokens)
 
-        # セキュリティ設定
-        self.cli_timeout = min(config.get('timeout', self.DEFAULT_TIMEOUT), self.MAX_TIMEOUT)
+        # タイムアウト値を安全に変換
+        try:
+            timeout_value = int(config.get('timeout', self.DEFAULT_TIMEOUT))
+        except (ValueError, TypeError):
+            timeout_value = self.DEFAULT_TIMEOUT
+        
+        self.cli_timeout = min(timeout_value, self.MAX_TIMEOUT)
 
         # claude-codeバイナリの検証
         self.claude_code_path = self._verify_claude_code_binary()
@@ -279,7 +288,7 @@ class ClaudeCodeProvider(BaseProvider):
         sanitized_prompt = self._sanitize_input(prompt)
 
         # コマンド引数の構築（安全な方法）
-        # Claude Code CLIの標準的な使用方法に基づく
+        # プロンプトはstdinで渡すため、CLI引数としては含めない
         cmd_args = [
             self.claude_code_path,
             'chat',
@@ -288,25 +297,22 @@ class ClaudeCodeProvider(BaseProvider):
             '--format', 'plain'
         ]
 
-        # テストモードでない場合は追加オプション
-        if not test_mode:
-            if hasattr(self, 'max_output_tokens') and self.max_output_tokens:
-                cmd_args.extend(['--max-tokens', str(self.max_output_tokens)])
-
-        # CLI仕様に応じてフラグを付けて渡す(要確認)
-        cmd_args.extend(['--prompt', sanitized_prompt])
+        # 注意: --max-tokens は公式でサポートされていない可能性があるため削除
+        # 必要に応じてCLIバージョンチェック後に追加を検討
 
         # 安全な環境変数の設定
         safe_env = self._create_safe_environment()
 
         try:
-            logger.debug(f"claude-codeコマンド実行: {' '.join(cmd_args[:3])}... (引数は安全にマスク)")
+            logger.debug(f"claude-codeコマンド実行: {' '.join(cmd_args[:3])}... (プロンプトはstdin経由)")
 
             # subprocess実行（セキュリティ要件に準拠）
             result = subprocess.run(
                 cmd_args,
+                input=sanitized_prompt,  # プロンプトをstdinに渡す
                 capture_output=True,
                 text=True,
+                encoding='utf-8',  # 明示的にエンコーディングを指定
                 timeout=self.cli_timeout,
                 env=safe_env,
                 shell=False,  # 重要: shell=False を使用
