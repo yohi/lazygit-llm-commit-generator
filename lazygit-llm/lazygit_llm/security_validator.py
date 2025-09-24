@@ -87,6 +87,7 @@ class SecurityValidator:
         self.max_diff_size = 500 * 1024    # 500KB
         self.enable_caching = enable_caching
         self._cache_lock = threading.Lock()
+        self.enable_parallel_processing = False
         self._processing_stats = {
             'total_validations': 0,
             'cache_hits': 0,

@@ -84,7 +84,7 @@ class ClaudeCodeProvider(BaseProvider):
         if not diff or not diff.strip():
             raise ProviderError("空の差分が提供されました")
 
-        prompt = self._format_prompt(diff, prompt_template)
+        prompt = prompt_template.replace('$diff', diff)
         logger.debug(f"Claude Code CLIにリクエスト送信: model={self.model}, prompt_length={len(prompt)}")
 
         try:
@@ -96,8 +96,8 @@ class ClaudeCodeProvider(BaseProvider):
             elapsed_time = time.time() - start_time
             logger.info(f"Claude Code CLI呼び出し完了: {elapsed_time:.2f}秒")
 
-            # レスポンスの検証
-            if not self._validate_response(response):
+            # レスポンスの検証（最小限）
+            if not response or not response.strip():
                 raise ResponseError("Claude Code CLIから無効なレスポンスを受信しました")
 
             return response

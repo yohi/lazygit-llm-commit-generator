@@ -55,7 +55,8 @@ class GeminiNativeCLIProvider(BaseProvider):
         self.temperature = additional_params.get('temperature', 0.3)
 
         # セキュリティ設定
-        self.cli_timeout = min(config.get('timeout', self.DEFAULT_TIMEOUT), self.MAX_TIMEOUT)
+        cfg_timeout = int(config.get('timeout', self.DEFAULT_TIMEOUT))
+        self.cli_timeout = min(max(cfg_timeout, 1), self.MAX_TIMEOUT)
 
         # geminiバイナリの検証
         self.gemini_path = self._verify_gemini_binary()
