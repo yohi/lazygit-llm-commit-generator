@@ -150,7 +150,7 @@ class InputValidator:
             os.getcwd(),
         ]
 
-        if not any(os.path.commonpath([resolved_path, os.path.realpath(allowed_dir)]) 
+        if not any(os.path.commonpath([resolved_path, os.path.realpath(allowed_dir)])
                    == os.path.realpath(allowed_dir) for allowed_dir in allowed_dirs):
             logger.warning(f"許可されていないディレクトリ: {path}")
             return False
