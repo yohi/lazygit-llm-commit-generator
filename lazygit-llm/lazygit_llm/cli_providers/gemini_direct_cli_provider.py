@@ -243,15 +243,14 @@ class GeminiDirectCLIProvider(BaseProvider):
         if self.model != 'gemini-1.5-pro':
             cmd.extend(['-m', self.model])
 
-        # プロンプト指定（--promptまたは-pオプション、非推奨だが動作する）
-        cmd.extend(['-p', prompt])
+        # プロンプト指定（--prompt を使用）
+        cmd.extend(['--prompt', prompt])
 
         # 環境変数設定（APIキーがある場合）
         env = os.environ.copy()
         if self.api_key:
             env['GEMINI_API_KEY'] = self.api_key
             env['GOOGLE_API_KEY'] = self.api_key
-            env['OPENAI_API_KEY'] = self.api_key  # このgemini CLIがOpenAIも使用する可能性
 
         logger.debug(f"小さなプロンプト({len(prompt)}bytes)をコマンド引数で実行")
 

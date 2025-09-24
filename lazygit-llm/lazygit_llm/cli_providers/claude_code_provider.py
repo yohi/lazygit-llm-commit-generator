@@ -10,6 +10,7 @@ import logging
 import time
 import os
 import shutil
+import tempfile
 from typing import Dict, Any, Optional, List, ClassVar
 from pathlib import Path
 
@@ -259,26 +260,37 @@ class ClaudeCodeProvider(BaseProvider):
             if os.path.basename(resolved_path) not in self.ALLOWED_BINARIES:
                 raise ProviderError(f"許可されていないバイナリ名です: {resolved_path}")
 
-            # 危険なパスのチェック（強化版）
-            dangerous_patterns = [
-                '/tmp/', '/var/tmp/', '/dev/shm/', '/proc/', '/sys/',
-                '../', '..\\', './', '.\\',  # パストラバーサル
-                '$HOME/.cache/', '/run/user/', '/private/tmp/'  # 一時ディレクトリ
+            # 危険なパスのチェック (強化版)
+            # 注意: resolved は絶対パスなので、トラバーサル(../, ./)の検出は不要
+            dangerous_prefixes = [
+                str(Path(tempfile.gettempdir())) + os.sep,
+                '/var/tmp' + os.sep,
+                '/dev/shm' + os.sep,
+                '/proc' + os.sep,
+                '/sys' + os.sep,
+                '/run/user' + os.sep,
+                '/private/tmp' + os.sep,
+                str(Path.home() / '.cache') + os.sep,
+                str(Path.home() / 'Library' / 'Caches') + os.sep,  # macOS
             ]
-            for pattern in dangerous_patterns:
-                if pattern in resolved_path:
-                    raise ProviderError(f"危険なパスが検出されました: {resolved_path}")
-
-            # 安全なディレクトリの確認（whitelist approach）
-            safe_directories = [
-                '/usr/bin/', '/usr/local/bin/', '/opt/', '/usr/sbin/',
-                '/bin/', '/sbin/', '/home/', '/Users/'
-            ]
-            is_safe_directory = any(resolved_path.startswith(safe_dir) 
-                                  for safe_dir in safe_directories)
             
+            resolved_path_str = str(resolved_path)
+            for prefix in dangerous_prefixes:
+                if resolved_path_str.startswith(prefix):
+                    raise ProviderError("危険なディレクトリが検出されました")
+
+            # 安全なディレクトリの確認 (whitelist approach) - HOME配下は除外
+            safe_directories = [
+                '/usr/local/bin/', '/usr/bin/', '/opt/', '/usr/sbin/',
+                '/bin/', '/sbin/', '/opt/homebrew/bin/',
+            ]
+            # Windows の標準ディレクトリも許可
+            if os.name == 'nt':
+                safe_directories += [r'C:\Program Files' + os.sep, r'C:\Program Files (x86)' + os.sep]
+
+            is_safe_directory = any(resolved_path_str.startswith(safe_dir) for safe_dir in safe_directories)
             if not is_safe_directory:
-                raise ProviderError(f"安全でないディレクトリが検出されました: {resolved_path}")
+                raise ProviderError("安全でないディレクトリが検出されました")
 
             # ファイル所有者とパーミッションの検証
             try:

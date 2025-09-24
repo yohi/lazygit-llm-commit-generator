@@ -98,7 +98,7 @@ class ConfigManager:
             'gcloud': {'type': 'cli', 'required_fields': ['model_name']},
             'gemini-cli': {'type': 'cli', 'required_fields': ['model_name']},
             'claude-code': {'type': 'cli', 'required_fields': ['model_name']},
-            'gemini-native': {'type': 'cli', 'required_fields': []},
+            'gemini-native': {'type': 'cli', 'required_fields': ['model_name']},
         }
 
     def load_config(self, config_path: str) -> Dict[str, Any]:
@@ -232,7 +232,9 @@ class ConfigManager:
 
         # {diff} または $diff のいずれかのプレースホルダーが含まれているかチェック
         if ('{diff}' not in template) and ('$diff' not in template):
-            raise ConfigError("プロンプトテンプレートに{diff} または $diff プレースホルダーが含まれていません")
+            logger = logging.getLogger(__name__)
+            logger.warning("プロンプトテンプレートに {diff} または $diff が無いため、末尾に自動追加します。")
+            template = f"{template.rstrip()}\n\n$diff\n"
 
         return template
 

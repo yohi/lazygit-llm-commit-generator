@@ -48,7 +48,7 @@ def setup_logging(verbose: bool = False) -> None:
         
     Security:
         - 一時ファイルは適切なファイルディスクリプタ管理で作成
-        - ログファイルパスは標準エラー出力に表示（詳細モード時のみ）
+        - ログファイルパスは標準エラー出力に表示(詳細モード時のみ)
     """
     level = logging.DEBUG if verbose else logging.INFO
     # セキュリティを考慮して一意な名前のログファイルを作成

@@ -23,10 +23,16 @@ def check_dns_resolution(hostname: str = "google.com") -> Tuple[bool, str]:
         (成功/失敗, メッセージ)
     """
     try:
+        # ホスト名の基本検証
+        if not hostname or len(hostname) > 255:
+            return False, f"無効なホスト名: {hostname}"
+        
         socket.gethostbyname(hostname)
         return True, f"DNS解決成功: {hostname}"
     except socket.gaierror as e:
-        return False, f"DNS解決失敗: {hostname} ({e})"
+        return False, f"DNS解決失敗: {hostname} ({str(e)})"
+    except Exception as e:
+        return False, f"DNS解決エラー: {hostname} (予期しないエラー)"
 
 
 def check_internet_connectivity(host: str = "8.8.8.8", port: int = 53, timeout: int = 3) -> Tuple[bool, str]:
@@ -43,10 +49,11 @@ def check_internet_connectivity(host: str = "8.8.8.8", port: int = 53, timeout: 
     """
     try:
         socket.setdefaulttimeout(timeout)
-        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.connect((host, port))
         return True, f"インターネット接続確認済み: {host}:{port}"
     except socket.error as e:
-        return False, f"インターネット接続失敗: {host}:{port} ({e})"
+        return False, f"インターネット接続失敗: {host}:{port} ({str(e)})"
 
 
 def check_google_api_connectivity() -> Tuple[bool, str]:
@@ -70,6 +77,10 @@ def ping_test(host: str = "google.com") -> Tuple[bool, str]:
         (成功/失敗, メッセージ)
     """
     try:
+        # ホスト名の基本検証
+        if not host or len(host) > 255:
+            return False, f"無効なホスト名: {host}"
+        
         # Windows/Linux対応
         ping_cmd = ["ping", "-c", "1"] if sys.platform != "win32" else ["ping", "-n", "1"]
         ping_cmd.append(host)
@@ -78,7 +89,8 @@ def ping_test(host: str = "google.com") -> Tuple[bool, str]:
             ping_cmd,
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=10,
+            check=False  # 明示的にcheck=Falseを設定
         )
 
         if result.returncode == 0:
@@ -88,8 +100,8 @@ def ping_test(host: str = "google.com") -> Tuple[bool, str]:
 
     except subprocess.TimeoutExpired:
         return False, f"Pingタイムアウト: {host}"
-    except Exception as e:
-        return False, f"Pingエラー: {host} ({e})"
+    except (subprocess.SubprocessError, OSError) as e:
+        return False, f"Pingエラー: {host} ({str(e)})"
 
 
 def comprehensive_network_check() -> List[Tuple[str, bool, str]]:
@@ -120,9 +132,12 @@ def comprehensive_network_check() -> List[Tuple[str, bool, str]]:
     return checks
 
 
-def print_network_status():
+def print_network_status() -> bool:
     """
     ネットワーク状態を表示
+    
+    Returns:
+        全てのネットワークチェックが成功した場合True
     """
     print("🌐 ネットワーク接続確認中...")
     print("=" * 50)
@@ -143,7 +158,7 @@ def print_network_status():
         print("Gemini CLIが動作しない場合は、以下を確認してください:")
         print("  - geminiコマンドのインストール状況")
         print("  - Google Cloud認証設定")
-        print("  - APIキー設定（必要な場合）")
+        print("  - APIキー設定(必要な場合)")
     else:
         print("❌ ネットワーク接続に問題があります")
         print("\n🔧 対処方法:")
