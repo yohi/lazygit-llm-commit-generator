@@ -16,8 +16,13 @@ uv sync --extra dev
 # Install project in development mode
 uv pip install -e .
 
-# Run the installation script
+# Run the automated installation script (recommended for new setups)
 uv run python install.py
+# This script handles: dependency installation, config directory creation,
+# LazyGit integration setup, and binary linking
+
+# Manual installation for advanced users
+./lazygit-llm-generate --test-config
 ```
 
 ### Testing
@@ -25,17 +30,21 @@ uv run python install.py
 # Run all tests
 uv run pytest tests/
 
-# Run specific test categories
-uv run pytest tests/ -m unit          # Unit tests only
-uv run pytest tests/ -m integration   # Integration tests only
-uv run pytest tests/ -m performance   # Performance tests only
-uv run pytest tests/ -m "not slow"    # Exclude slow tests
+# Run specific test categories (defined in pyproject.toml)
+uv run pytest tests/ -m unit          # Unit tests - Individual component testing
+uv run pytest tests/ -m integration   # Integration tests - End-to-end provider testing  
+uv run pytest tests/ -m performance   # Performance tests - Response time and resource usage
+uv run pytest tests/ -m "not slow"    # Exclude slow tests - Fast test execution
 
 # Run single test file
 uv run pytest tests/test_config_manager.py
 
 # Run with coverage
 uv run pytest tests/ --cov=lazygit_llm --cov-report=html
+
+# Run tests from specific directories
+uv run pytest tests/integration/      # Integration tests only
+uv run pytest tests/performance/      # Performance tests only
 ```
 
 ### Code Quality
@@ -87,24 +96,30 @@ uv add --dev package_name
 The project follows a plugin-based architecture with clear separation between API and CLI providers:
 
 ```
-lazygit_llm/                 # Core application package
-├── main.py                  # Entry point and CLI interface
-├── config_manager.py        # YAML configuration and env var management
-├── git_processor.py         # Git operations and diff processing
-├── provider_factory.py      # Factory for creating LLM providers
-├── message_formatter.py     # Output formatting and cleanup
-└── base_provider.py         # Abstract base class for all providers
-
-src/                         # Provider implementations
-├── api_providers/           # REST API-based providers
-│   ├── openai_provider.py   # OpenAI GPT integration
-│   ├── anthropic_provider.py # Anthropic Claude integration
-│   └── gemini_api_provider.py # Google Gemini API integration
-├── cli_providers/           # CLI-based providers
-│   ├── claude_code_provider.py # Claude Code CLI integration
-│   └── gemini_cli_provider.py  # Google Gemini CLI integration
-├── error_handler.py         # Centralized error handling
-└── security_validator.py   # Input validation and security
+lazygit-llm/                 # Project root directory
+├── lazygit_llm/             # Core application package
+│   ├── main.py              # Entry point and CLI interface
+│   ├── config_manager.py    # YAML configuration and env var management
+│   ├── git_processor.py     # Git operations and diff processing
+│   ├── provider_factory.py  # Factory for creating LLM providers
+│   ├── message_formatter.py # Output formatting and cleanup
+│   ├── base_provider.py     # Abstract base class for all providers
+│   ├── api_providers/       # (legacy) API provider imports
+│   └── cli_providers/       # CLI provider implementations
+│       ├── claude_code_provider.py # Claude Code CLI integration
+│       └── gemini_cli_provider.py  # Google Gemini CLI integration
+├── src/                     # Provider implementations
+│   ├── api_providers/       # REST API-based providers
+│   │   ├── openai_provider.py   # OpenAI GPT integration
+│   │   ├── anthropic_provider.py # Anthropic Claude integration
+│   │   └── gemini_api_provider.py # Google Gemini API integration
+│   ├── cli_providers/       # Additional CLI provider implementations
+│   ├── error_handler.py     # Centralized error handling
+│   └── security_validator.py # Input validation and security
+└── tests/                   # Comprehensive test suite
+    ├── integration/         # End-to-end integration tests
+    ├── performance/         # Performance and load testing
+    └── test_*.py           # Unit tests for each component
 ```
 
 ### Provider System
@@ -144,13 +159,28 @@ The `ProviderFactory` dynamically loads providers based on configuration:
 - Mock implementations for external APIs during testing
 
 ## Configuration File Locations
-- Main config: `~/.config/lazygit-llm/config.yml`
-- LazyGit integration: `~/.config/lazygit/config.yml`
-- Example config: `lazygit-llm/config/config.yml.example`
+- **Main config**: `~/.config/lazygit-llm/config.yml`
+- **LazyGit integration**: `~/.config/lazygit/config.yml`
+- **Example configs**: 
+  - `config/config.yml.example` (project root)
+  - `lazygit-llm/config/config.yml.example` (package level)
+- **Development config**: `lazygit-llm/config/config.yml` (local testing)
 
 ## Important Implementation Notes
-- The `lazygit-llm/` directory contains the actual package source
-- Provider modules are dynamically imported by the factory
-- All external API calls include timeout and retry mechanisms
+
+### Package Structure
+- The `lazygit-llm/` directory contains the actual package source code
+- Provider modules are dynamically imported by the factory pattern
+- Both `src/` and `lazygit_llm/` contain provider implementations (legacy structure)
+
+### Development Workflow  
+- Use `install.py` for automated setup of new development environments
+- The tool integrates with LazyGit as a custom command (`Ctrl+G` by default)
+- All external API calls include configurable timeout and retry mechanisms
 - Error handling provides user-friendly messages while logging technical details
-- The tool is designed to fail gracefully and never break the user's Git workflow
+
+### Design Principles
+- Fail gracefully and never break the user's Git workflow
+- Security-first approach with input sanitization and safe subprocess execution
+- Plugin-based architecture allows easy addition of new LLM providers
+- Environment variable-based configuration for secure API key management

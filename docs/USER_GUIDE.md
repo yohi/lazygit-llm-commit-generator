@@ -110,7 +110,7 @@ additional_params:
 #### Google Gemini API
 
 ```yaml
-provider: "gemini-api"
+provider: "gemini"
 model_name: "gemini-1.5-pro"  # 推奨
 api_key: "${GOOGLE_API_KEY}"
 additional_params:
@@ -132,12 +132,24 @@ model_name: "claude-3-5-sonnet-20241022"
 #### Gemini CLI (gcloud)
 
 ```yaml
-provider: "gemini-cli"
+provider: "gcloud"
 model_name: "gemini-1.5-pro"
 additional_params:
   project_id: "your-gcp-project-id"
   location: "us-central1"
 ```
+
+#### Gemini CLI (直接geminiコマンド)
+
+```yaml
+provider: "gemini-cli"
+model_name: "gemini-1.5-pro"
+additional_params:
+  temperature: 0.3
+  # api_key: "${GEMINI_API_KEY}"  # 通常は不要（geminiコマンド認証済み）
+```
+
+**前提条件**: geminiコマンドがインストール・認証済み
 
 **前提条件**: gcloud CLIがインストール・認証済み
 
@@ -356,10 +368,10 @@ git add test.txt
 ### パフォーマンス指標
 
 | プロバイダー | 平均レスポンス時間 | 品質スコア | コスト |
-|------------|-----------------|-----------|-------|
-| GPT-4 | 3-5秒 | ⭐⭐⭐⭐⭐ | 高 |
-| Claude 3.5 | 4-7秒 | ⭐⭐⭐⭐⭐ | 中 |
-| Gemini Pro | 2-4秒 | ⭐⭐⭐⭐ | 低 |
+| ------------ | ------------------ | ---------- | ------ |
+| GPT-4        | 3-5秒              | ⭐⭐⭐⭐⭐      | 高     |
+| Claude 3.5   | 4-7秒              | ⭐⭐⭐⭐⭐      | 中     |
+| Gemini Pro   | 2-4秒              | ⭐⭐⭐⭐       | 低     |
 
 ### 使用量制限
 
