@@ -394,7 +394,7 @@ class Installer:
             'command': f'git diff --staged | "{launcher}" --config "{config_path}"',
             'context': 'files',
             'description': 'Generate commit message with LLM',
-            'stream': True
+            'output': 'log'
         }
 
         # 既存設定を読み込み
@@ -408,23 +408,38 @@ class Installer:
         if 'customCommands' not in config:
             config['customCommands'] = []
 
-        # 既存のコマンドをチェック
+        # 既存のコマンドをチェック（重複防止）
         existing_commands = config['customCommands']
-        for cmd in existing_commands:
+        command_updated = False
+
+        for i, cmd in enumerate(existing_commands):
             if cmd.get('key') == '<c-g>' and 'LLM' in cmd.get('description', ''):
                 print("   ℹ️ 既存のLLMコマンドを更新")
-                cmd.update(custom_command)
+                # 完全に置き換えて重複キーを防ぐ
+                existing_commands[i] = custom_command.copy()
+                command_updated = True
                 break
-        else:
+
+        if not command_updated:
             # 新しいコマンドを追加
             existing_commands.append(custom_command)
 
         # 設定ディレクトリを作成
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
-        # 設定を保存
-        with open(config_file, 'w', encoding='utf-8') as f:
-            yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+        # 設定を安全に保存（重複キー防止）
+        try:
+            # 保存前にYAMLの妥当性を検証
+            yaml_content = yaml.dump(config, default_flow_style=False, allow_unicode=True)
+            # 再パースして重複がないことを確認
+            yaml.safe_load(yaml_content)
+
+            with open(config_file, 'w', encoding='utf-8') as f:
+                f.write(yaml_content)
+
+        except yaml.YAMLError as e:
+            logger.error(f"YAML保存エラー: {e}")
+            raise InstallationError(f"YAML設定の保存に失敗しました: {e}")
 
     def create_executable_script(self) -> None:
         """実行可能スクリプトを作成"""

@@ -28,7 +28,7 @@ class GeminiDirectCLIProvider(BaseProvider):
     """
 
     # セキュリティ設定
-    ALLOWED_BINARIES: ClassVar[tuple[str, ...]] = ('gemini',)
+    ALLOWED_BINARIES: ClassVar[tuple[str, ...]] = ('gemini', 'gemini-wrapper.sh')
     MAX_STDOUT_SIZE: ClassVar[int] = 1024 * 1024  # 1MB
     MAX_STDERR_SIZE: ClassVar[int] = 1024 * 1024  # 1MB
     DEFAULT_TIMEOUT: ClassVar[int] = 30  # 30秒
@@ -117,16 +117,34 @@ class GeminiDirectCLIProvider(BaseProvider):
             logger.error("Geminiコマンド実行エラー: returncode=%s, stderr=%s", e.returncode, stderr_output)
 
             # エラーの種類に応じた詳細なメッセージ
-            if "quota exceeded" in stderr_output.lower() or "429" in stderr_output or "rate limit" in stderr_output.lower():
-                raise ProviderError(f"Gemini APIクォータ制限: 1日あたりのリクエスト制限に達しました\n明日再試行するか、別のプロバイダー（openai、anthropic）をご利用ください") from e
-            elif "authentication" in stderr_output.lower() or "api key" in stderr_output.lower():
-                raise AuthenticationError("Gemini CLI認証エラー: APIキーまたは認証設定を確認してください") from e
-            elif "network" in stderr_output.lower() or "connection" in stderr_output.lower() or "connectivity" in stderr_output.lower():
-                raise ProviderError(f"ネットワーク接続エラー: {stderr_output}\nインターネット接続を確認してください") from e
-            elif "timeout" in stderr_output.lower() or "timed out" in stderr_output.lower():
-                raise ProviderTimeoutError(f"Gemini APIタイムアウト: {stderr_output}\n設定ファイルでtimeout値を増やしてください") from e
-            elif e.returncode == 1:
-                raise AuthenticationError("Gemini CLI認証エラー: 認証情報を確認してください") from e
+            # まずstdoutとstderrを結合してチェック
+            combined_output = f"{stdout_output}\n{stderr_output}".lower()
+
+            # クォータ制限の改善された検出
+            if any(keyword in combined_output for keyword in ["quota exceeded", "429", "rate limit", "クォータ制限", "フォールバック"]):
+                # ラッパースクリプトからのフォールバック情報があれば、それを利用
+                if "フォールバック成功" in stderr_output or "フォールバック成功" in stdout_output:
+                    logger.info("ラッパースクリプトによるフォールバック処理が検出されました")
+                    # フォールバック成功時でも終了コード1の場合は、実際のGeminiエラーを確認
+                    if stdout_output.strip():
+                        return stdout_output.strip()  # Geminiからの実際の回答を返す
+                raise ProviderError(f"⚠️ Gemini APIクォータ制限: 1日あたりのリクエスト制限に達しました\n🔄 自動フォールバック機能が利用可能です（gemini-wrapper使用時）\n💡 明日再試行するか、別のプロバイダー（openai、anthropic）をご利用ください") from e
+            elif "authentication" in combined_output or "api key" in combined_output:
+                raise AuthenticationError("🔑 Gemini CLI認証エラー: APIキーまたは認証設定を確認してください") from e
+            elif any(keyword in combined_output for keyword in ["network", "connection", "connectivity"]):
+                raise ProviderError(f"🌐 ネットワーク接続エラー: {stderr_output}\n📡 インターネット接続を確認してください") from e
+            elif any(keyword in combined_output for keyword in ["timeout", "timed out"]):
+                raise ProviderTimeoutError(f"⏰ Gemini APIタイムアウト: {stderr_output}\n⚙️ 設定ファイルでtimeout値を増やしてください") from e
+            # Gemini CLIの一般的なエラー（改善）
+            elif "error when talking to gemini api" in combined_output:
+                if stdout_output.strip():
+                    # stdoutに有効な内容があれば、それを返す（クォータエラー後のフォールバック成功）
+                    logger.warning("Gemini APIエラーが発生しましたが、有効なレスポンスが得られました")
+                    return stdout_output.strip()
+                raise ProviderError(f"🤖 Gemini API通信エラー: APIサービスとの通信に失敗しました\n📋 詳細: {stdout_output}\n💡 しばらく待ってから再試行してください") from e
+            elif e.returncode == 1 and not stdout_output.strip():
+                # 標準出力が空で終了コード1の場合のみ認証エラーとする
+                raise AuthenticationError("🔑 Gemini CLI認証エラー: 認証情報を確認してください") from e
             else:
                 error_msg = stderr_output or stdout_output or "不明なエラー"
                 raise ProviderError(f"Gemini CLI実行エラー (終了コード: {e.returncode}): {error_msg}") from e
@@ -136,7 +154,7 @@ class GeminiDirectCLIProvider(BaseProvider):
 
     def _verify_gemini_binary(self) -> str:
         """
-        geminiバイナリのパスを検証
+        geminiバイナリのパスを検証（ラッパースクリプト優先）
 
         Returns:
             検証済みのgeminiバイナリパス
@@ -144,6 +162,17 @@ class GeminiDirectCLIProvider(BaseProvider):
         Raises:
             ProviderError: geminiコマンドが見つからない場合
         """
+        # 1. ラッパースクリプトを最優先で検索
+        wrapper_path = Path.home() / "bin" / "gemini-wrapper.sh"
+        if wrapper_path.exists() and wrapper_path.is_file():
+            # ラッパースクリプトが実行可能かチェック
+            if os.access(wrapper_path, os.X_OK):
+                logger.info(f"改善されたgeminiラッパースクリプトを使用: {wrapper_path}")
+                return str(wrapper_path)
+            else:
+                logger.warning(f"ラッパースクリプトが実行可能ではありません: {wrapper_path}")
+
+        # 2. 標準のgeminiコマンドを検索
         gemini_path = shutil.which('gemini')
         if not gemini_path:
             raise ProviderError(
@@ -156,7 +185,7 @@ class GeminiDirectCLIProvider(BaseProvider):
         if binary_name not in self.ALLOWED_BINARIES:
             raise ProviderError(f"許可されていないバイナリ: {binary_name}")
 
-        logger.debug(f"geminiバイナリを検証: {gemini_path}")
+        logger.debug(f"標準geminiバイナリを使用: {gemini_path}")
         return gemini_path
 
     def _execute_gemini_command(self, prompt: str, timeout: Optional[int] = None) -> str:
@@ -263,9 +292,33 @@ class GeminiDirectCLIProvider(BaseProvider):
             check=False
         )
 
+        # デバッグログを追加
+        logger.debug(f"subprocess結果: returncode={result.returncode}, stdout_length={len(result.stdout) if result.stdout else 0}, stderr_length={len(result.stderr) if result.stderr else 0}")
+        logger.debug(f"stdout内容: {result.stdout[:200] if result.stdout else 'None'}...")
+        logger.debug(f"stderr内容: {result.stderr[:200] if result.stderr else 'None'}...")
+
+        # "Error when talking to Gemini API"メッセージがあっても、有効なコンテンツがstdoutにある場合は成功とみなす
         if result.returncode != 0:
+            stdout_content = result.stdout.strip() if result.stdout else ""
+            stderr_content = result.stderr.strip() if result.stderr else ""
+
+            # Gemini CLIの「Error when talking to Gemini API」はクォータ制限を示すことが多い
+            if "Error when talking to Gemini API" in stdout_content:
+                logger.info("Gemini APIエラーメッセージを検出: クォータ制限の可能性があります")
+                # エラーメッセージ部分を除去して、実際のコンテンツがあるかチェック
+                cleaned_output = stdout_content.replace("Error when talking to Gemini API", "").strip()
+                lines = [line for line in cleaned_output.split('\n') if line.strip() and not line.startswith('Loaded cached credentials') and not 'Full report available' in line]
+
+                if lines:
+                    logger.warning(f"Gemini APIエラーがありましたが、有効なコンテンツも取得できました: {' '.join(lines)[:100]}...")
+                    return '\n'.join(lines)
+                else:
+                    # 有効なコンテンツがない場合はクォータエラーとして処理
+                    logger.info("有効なコンテンツが見つからないため、クォータエラーとして処理します")
+                    raise ProviderError(f"🚨 Gemini APIクォータ制限: 1日あたりのリクエスト制限に達しました\n💡 明日再試行するか、別のプロバイダー（openai、anthropic）をご利用ください\n📋 詳細: {stdout_content[:200]}...") from e
+
             # より詳細なエラー情報を提供
-            stderr_msg = result.stderr.strip() if result.stderr else "不明なエラー"
+            stderr_msg = stderr_content or "不明なエラー"
             logger.error(f"geminiコマンド実行失敗: returncode={result.returncode}, stderr={stderr_msg}")
             raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
 

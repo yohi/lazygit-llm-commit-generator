@@ -26,7 +26,7 @@ class GeminiNativeCLIProvider(BaseProvider):
     """
 
     # セキュリティ設定
-    ALLOWED_BINARIES: ClassVar[tuple[str, ...]] = ('gemini',)
+    ALLOWED_BINARIES: ClassVar[tuple[str, ...]] = ('gemini', 'gemini-wrapper.sh')
     MAX_STDOUT_SIZE: ClassVar[int] = 1024 * 1024  # 1MB
     MAX_STDERR_SIZE: ClassVar[int] = 1024 * 1024  # 1MB
     DEFAULT_TIMEOUT: ClassVar[int] = 30  # 30秒
@@ -127,7 +127,7 @@ class GeminiNativeCLIProvider(BaseProvider):
 
     def _verify_gemini_binary(self) -> str:
         """
-        geminiバイナリの存在と安全性を検証
+        geminiバイナリの存在と安全性を検証（ラッパースクリプト優先）
 
         Returns:
             検証されたgeminiバイナリのパス
@@ -135,6 +135,17 @@ class GeminiNativeCLIProvider(BaseProvider):
         Raises:
             ProviderError: geminiバイナリが見つからない、または安全でない場合
         """
+        # 1. ラッパースクリプトを最優先で検索
+        wrapper_path = Path.home() / "bin" / "gemini-wrapper.sh"
+        if wrapper_path.exists() and wrapper_path.is_file():
+            # ラッパースクリプトが実行可能かチェック
+            if os.access(wrapper_path, os.X_OK):
+                logger.info(f"改善されたgeminiラッパースクリプトを使用: {wrapper_path}")
+                return str(wrapper_path)
+            else:
+                logger.warning(f"ラッパースクリプトが実行可能ではありません: {wrapper_path}")
+
+        # 2. 標準のgeminiコマンドを検索
         gemini_path = shutil.which('gemini')
         if not gemini_path:
             raise ProviderError(
@@ -149,7 +160,7 @@ class GeminiNativeCLIProvider(BaseProvider):
         if not os.access(gemini_path, os.X_OK):
             raise ProviderError(f"geminiバイナリが実行可能ではありません: {gemini_path}")
 
-        logger.debug("geminiバイナリを検証: %s", gemini_path)
+        logger.debug("標準geminiバイナリを検証: %s", gemini_path)
         return gemini_path
 
     def _sanitize_command_for_logging(self, cmd: list) -> str:

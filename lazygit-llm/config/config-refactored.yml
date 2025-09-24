@@ -1,0 +1,266 @@
+# =============================================================================
+# LazyGit LLM Configuration (Refactored)
+# =============================================================================
+# リファクタリング版設定ファイル
+# - 明確な設定分離
+# - 改善されたエラーハンドリング
+# - 環境別設定対応
+# =============================================================================
+
+# =====================================
+# 全般設定
+# =====================================
+general:
+  version: "2.0"
+  debug: false
+  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  max_retry_attempts: 3
+
+# =====================================
+# プロバイダー設定
+# =====================================
+providers:
+  # 優先順位（数字が小さいほど優先）
+  priority_order:
+    - name: "gemini-cli-refactored"
+      priority: 1
+      enabled: true
+    - name: "gemini-cli"
+      priority: 2
+      enabled: false  # フォールバック用
+    - name: "openai"
+      priority: 3
+      enabled: false
+    - name: "anthropic"
+      priority: 4
+      enabled: false
+
+  # Gemini CLI設定（リファクタリング版）
+  gemini-cli-refactored:
+    model_name: "gemini-1.5-pro"
+    timeout: 30
+    fallback_model: "gemini-1.5-flash"
+    auto_fallback: true
+    silent_mode: false
+    wrapper_path: "/home/y_ohi/bin/gemini-wrapper-refactored.sh"
+
+    # エラーハンドリング設定
+    error_handling:
+      classify_errors: true
+      max_classification_retries: 2
+      confidence_threshold: 0.7
+
+    # ラッパースクリプト設定
+    wrapper_settings:
+      auto_detect_lazygit: true
+      enable_quota_fallback: true
+      verbose_logging: false
+
+  # 従来のGemini CLI設定（互換性維持）
+  gemini-cli:
+    model_name: "gemini-1.5-pro"
+    timeout: 30
+    fallback_enabled: false
+
+  # OpenAI設定（将来拡張用）
+  openai:
+    model_name: "gpt-4"
+    timeout: 30
+    max_tokens: 150
+    temperature: 0.1
+
+  # Anthropic設定（将来拡張用）
+  anthropic:
+    model_name: "claude-3-sonnet-20240229"
+    timeout: 30
+    max_tokens: 150
+
+# =====================================
+# プロンプト設定
+# =====================================
+prompts:
+  default_template: |
+    Based on the following git diff, generate a concise commit message that follows conventional commits format:
+
+    {diff}
+
+    Generate only the commit message, no additional text.
+
+  # プロンプトのバリエーション
+  templates:
+    conventional:
+      name: "Conventional Commits"
+      template: |
+        Based on the following git diff, generate a commit message following the Conventional Commits specification:
+
+        Format: <type>[optional scope]: <description>
+
+        Types: feat, fix, docs, style, refactor, test, chore
+
+        {diff}
+
+        Generate only the commit message, no additional text.
+
+    detailed:
+      name: "Detailed Description"
+      template: |
+        Analyze the following git diff and generate a detailed commit message:
+
+        {diff}
+
+        Include:
+        - What was changed
+        - Why it was changed
+        - Any important implementation details
+
+        Format as a conventional commit with detailed body if needed.
+
+    japanese:
+      name: "Japanese Commit Message"
+      template: |
+        以下のgit diffを分析して、適切な日本語のコミットメッセージを生成してください：
+
+        {diff}
+
+        形式：
+        - 簡潔で分かりやすい説明
+        - 変更の種類を明確に
+        - コミットメッセージのみを出力
+
+# =====================================
+# 安全性設定
+# =====================================
+security:
+  # Git差分のサニタイゼーション
+  sanitize_diff: true
+  max_diff_size: 10240  # バイト
+
+  # プロンプトインジェクション対策
+  prompt_validation: true
+  max_prompt_size: 8192  # バイト
+
+  # 許可されたバイナリ
+  allowed_binaries:
+    - "gemini"
+    - "gemini-wrapper.sh"
+    - "gemini-wrapper-refactored.sh"
+
+  # 安全なパス
+  safe_path_prefixes:
+    - "/home/y_ohi/bin/"
+    - "/home/linuxbrew/.linuxbrew/bin/"
+    - "/usr/bin/"
+    - "/usr/local/bin/"
+
+# =====================================
+# パフォーマンス設定
+# =====================================
+performance:
+  # キャッシュ設定
+  cache_enabled: true
+  cache_ttl: 3600  # 秒
+  max_cache_size: 100  # エントリー数
+
+  # 並行処理設定
+  max_concurrent_requests: 3
+  request_timeout: 30
+
+  # レート制限
+  rate_limit:
+    enabled: true
+    requests_per_minute: 60
+    burst_size: 10
+
+# =====================================
+# ロギング設定
+# =====================================
+logging:
+  # ログレベル
+  level: "INFO"
+
+  # ログファイル
+  file:
+    enabled: true
+    path: "/tmp/lazygit-llm-refactored.log"
+    max_size: 10485760  # 10MB
+    backup_count: 5
+
+  # コンソール出力
+  console:
+    enabled: true
+    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+  # 機密情報の除去
+  sanitize_logs: true
+  exclude_patterns:
+    - "api_key"
+    - "token"
+    - "password"
+
+# =====================================
+# 環境固有設定
+# =====================================
+environments:
+  development:
+    debug: true
+    log_level: "DEBUG"
+    providers:
+      gemini-cli-refactored:
+        verbose_logging: true
+
+  production:
+    debug: false
+    log_level: "WARNING"
+    security:
+      prompt_validation: true
+      sanitize_diff: true
+
+  testing:
+    debug: true
+    log_level: "DEBUG"
+    providers:
+      gemini-cli-refactored:
+        timeout: 5  # 短いタイムアウト
+
+# =====================================
+# 機能フラグ
+# =====================================
+features:
+  # 新機能の有効/無効
+  enhanced_error_classification: true
+  auto_fallback_providers: true
+  smart_prompt_selection: false
+  git_commit_validation: true
+
+  # 実験的機能
+  experimental:
+    ai_powered_diff_analysis: false
+    multi_language_commits: false
+    commit_message_suggestions: false
+
+# =====================================
+# メンテナンス設定
+# =====================================
+maintenance:
+  # 自動クリーンアップ
+  auto_cleanup: true
+  cleanup_interval: 86400  # 24時間（秒）
+
+  # ヘルスチェック
+  health_check:
+    enabled: true
+    interval: 300  # 5分（秒）
+    endpoints:
+      - name: "gemini_api"
+        url: "https://generativelanguage.googleapis.com/v1/models"
+        timeout: 10
+
+  # 統計情報
+  statistics:
+    enabled: true
+    collection_interval: 3600  # 1時間（秒）
+    metrics:
+      - "request_count"
+      - "error_rate"
+      - "response_time"
+      - "provider_usage"
