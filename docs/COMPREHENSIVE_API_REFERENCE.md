@@ -149,7 +149,6 @@ class ProviderConfig:
 - `anthropic`: Anthropic Claude
 - `gemini`: Google Gemini API
 - `gcloud`: Google Gemini CLI (gcloud)
-- `gemini-cli`: Google Gemini CLI (直接geminiコマンド)
 - `claude-code`: Claude Code CLI
 
 **動的インポート**:
