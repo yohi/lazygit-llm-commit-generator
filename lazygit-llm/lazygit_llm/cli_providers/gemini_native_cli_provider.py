@@ -298,6 +298,43 @@ class GeminiNativeCLIProvider(BaseProvider):
 
         return cleaned
 
+    def _create_safe_environment(self) -> Dict[str, str]:
+        """
+        安全な環境変数を作成
+
+        Returns:
+            最小限の安全な環境変数辞書
+        """
+        # 必要最小限の環境変数のみ継承
+        safe_vars = [
+            'PATH',
+            'HOME',
+            'USER',
+            'LANG',
+            'LC_ALL',
+            'NO_COLOR'
+        ]
+
+        safe_env = {}
+        for var in safe_vars:
+            if var in os.environ:
+                if var in ('LANG', 'LC_ALL'):
+                    safe_env[var] = os.environ.get(var, 'C.UTF-8')
+                elif var == 'NO_COLOR':
+                    safe_env[var] = '1'
+                else:
+                    safe_env[var] = os.environ[var]
+
+        # セキュリティのため、明示的にシェル関連の環境変数を除去
+        excluded_vars = ['SHELL', 'PS1', 'PS2']
+        for var in excluded_vars:
+            safe_env.pop(var, None)
+
+        # 文字化け防止: 最低限UTF-8ロケールを保証
+        safe_env.setdefault('LC_ALL', 'C.UTF-8')
+
+        return safe_env
+
     def _is_safe_binary_path(self, path: str) -> bool:
         """
         バイナリパスの安全性をチェック
