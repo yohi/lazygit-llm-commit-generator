@@ -27,10 +27,10 @@ logger = logging.getLogger(__name__)
 class DiffData:
     """
     Git差分情報を構造化したデータクラス。
-    
+
     生の差分データから抽出した統計情報とメタデータを保持します。
     LLMプロバイダーでの処理効率化とセキュリティ検証に使用されます。
-    
+
     Attributes:
         raw_diff (str): 生のgit diff出力テキスト
         file_count (int): 変更されたファイル数
@@ -39,7 +39,7 @@ class DiffData:
         files_changed (List[str]): 変更されたファイル名のリスト
         is_binary_change (bool): バイナリファイルの変更が含まれるかどうか
         total_lines (int): 差分に含まれる総行数
-        
+
     Example:
         >>> diff_data = DiffData(
         ...     raw_diff="diff --git a/file.py...",
@@ -66,11 +66,11 @@ class GitError(Exception):
 class GitDiffProcessor:
     """
     Git差分の取得、解析、処理を行う統合クラス。
-    
+
     LazyGitとの統合において中核的な役割を果たし、ステージされたGit差分の
     安全で効率的な処理を提供します。セキュリティ検証、パフォーマンス最適化、
     エラーハンドリングを統合的に実装。
-    
+
     Main Features:
         - 標準入力からのgit diff読み取りと解析
         - subprocess経由での `git diff --staged` 実行
@@ -78,18 +78,18 @@ class GitDiffProcessor:
         - セキュリティ検証(機密情報検出、サイズ制限)
         - パフォーマンス最適化(キャッシュ、並行処理)
         - LazyGit統合対応(ステージ変更確認)
-    
+
     Security Features:
         - 機密情報(APIキー等)の検出とマスキング
         - 差分サイズ制限(デフォルト50KB)
         - バイナリファイル変更の検出と除外
         - 入力データのサニタイゼーション
-    
+
     Performance Features:
         - LRUキャッシュによる重複処理回避
         - 並行処理によるI/O最適化
         - メモリ効率的な大きな差分の処理
-    
+
     Example:
         >>> processor = GitDiffProcessor(max_diff_size=100000)
         >>> diff_data = processor.get_staged_diff()

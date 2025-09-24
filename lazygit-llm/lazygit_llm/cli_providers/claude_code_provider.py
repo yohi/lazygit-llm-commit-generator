@@ -47,7 +47,7 @@ class ClaudeCodeProvider(BaseProvider):
         # デフォルト値を設定してからsuper().__init__を呼び出し
         config.setdefault('model_name', 'claude-3-5-sonnet-20241022')
         config.setdefault('additional_params', {})
-        
+
         super().__init__(config)
 
         # 設定の検証
@@ -66,7 +66,7 @@ class ClaudeCodeProvider(BaseProvider):
             timeout_value = int(config.get('timeout', self.DEFAULT_TIMEOUT))
         except (ValueError, TypeError):
             timeout_value = self.DEFAULT_TIMEOUT
-        
+
         self.cli_timeout = min(timeout_value, self.MAX_TIMEOUT)
 
         # claude-codeバイナリの検証
@@ -273,7 +273,7 @@ class ClaudeCodeProvider(BaseProvider):
                 str(Path.home() / '.cache') + os.sep,
                 str(Path.home() / 'Library' / 'Caches') + os.sep,  # macOS
             ]
-            
+
             resolved_path_str = str(resolved_path)
             for prefix in dangerous_prefixes:
                 if resolved_path_str.startswith(prefix):
@@ -299,7 +299,7 @@ class ClaudeCodeProvider(BaseProvider):
                 if stat_info.st_mode & 0o002:  # world-writable
                     raise ProviderError(f"バイナリが誰でも書き込み可能です: {resolved_path}")
                 # グループが書き込み可能でrootまたは現在のユーザー所有でない場合
-                if (stat_info.st_mode & 0o020 and 
+                if (stat_info.st_mode & 0o020 and
                     stat_info.st_uid != 0 and stat_info.st_uid != os.getuid()):
                     raise ProviderError(f"バイナリの権限が安全ではありません: {resolved_path}")
             except OSError as e:
@@ -324,10 +324,10 @@ class ClaudeCodeProvider(BaseProvider):
         """
         # バイナリパスから実際のコマンド名を取得
         binary_name = os.path.basename(self.claude_code_path)
-        
+
         # 基本のコマンド引数
         base_args = [self.claude_code_path]
-        
+
         try:
             # --helpでサポートされているフラグを確認
             help_result = subprocess.run(
@@ -337,59 +337,59 @@ class ClaudeCodeProvider(BaseProvider):
                 timeout=10,
                 shell=False
             )
-            
+
             help_output = help_result.stdout + help_result.stderr
             logger.debug(f"Claude Code CLI ヘルプ出力を確認: {binary_name}")
-            
+
         except subprocess.TimeoutExpired:
             logger.warning("Claude Code CLI --help がタイムアウト、デフォルトフラグを使用")
             help_output = ""
         except Exception as e:
             logger.warning(f"Claude Code CLI --help 実行エラー: {e}, デフォルトフラグを使用")
             help_output = ""
-        
+
         # フラグの可用性を確認
         flags = {
             'print_flag': None,      # 非対話モード: -p, --print
             'output_format': None,   # 出力形式: --output-format
             'model_flag': None       # モデル指定: --model
         }
-        
+
         help_lower = help_output.lower()
-        
+
         # 非対話モードフラグの検出
         if '-p, --print' in help_lower or '--print' in help_lower:
             flags['print_flag'] = '--print'
         elif '-p' in help_lower:
             flags['print_flag'] = '-p'
-        
+
         # 出力形式フラグの検出
         if '--output-format' in help_lower:
             flags['output_format'] = 'text'  # text/json/stream-json
-        
+
         # モデルフラグの検出
         if '--model' in help_lower:
             flags['model_flag'] = True
-        
+
         # コマンド引数の構築
         cmd_args = base_args.copy()
-        
+
         # chatコマンドが利用可能かチェック（claude-codeの場合）
         if 'chat' in help_lower or binary_name in ['claude-code']:
             cmd_args.append('chat')
-        
+
         # モデル指定
         if flags['model_flag']:
             cmd_args.extend(['--model', self.model])
-        
+
         # 非対話モード
         if flags['print_flag']:
             cmd_args.append(flags['print_flag'])
-        
+
         # 出力形式（利用可能な場合）
         if flags['output_format']:
             cmd_args.extend(['--output-format', flags['output_format']])
-        
+
         logger.debug(f"構築されたコマンド引数: {' '.join(cmd_args[:4])}... (プロンプトはstdin経由)")
         return cmd_args
 
@@ -423,7 +423,7 @@ class ClaudeCodeProvider(BaseProvider):
                 '--model', self.model,
                 '--print'  # 非対話モードの一般的なフラグ
             ]
-            
+
             # chatサブコマンドが必要かチェック
             binary_name = os.path.basename(self.claude_code_path)
             if binary_name in ['claude-code']:

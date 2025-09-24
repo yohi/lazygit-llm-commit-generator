@@ -22,10 +22,10 @@ logger = logging.getLogger(__name__)
 class ProviderConfig:
     """
     プロバイダー設定を表すデータクラス。
-    
+
     LLMプロバイダーの動作に必要な全ての設定パラメータを保持します。
     APIキーの安全な管理と、プロバイダー固有のパラメータをサポートします。
-    
+
     Attributes:
         name (str): プロバイダー名（例: "openai", "anthropic", "gemini-api"）
         type (str): プロバイダータイプ（"api" または "cli"）
@@ -34,7 +34,7 @@ class ProviderConfig:
         timeout (int): リクエストタイムアウト時間（秒）。デフォルト: 30
         max_tokens (int): 最大生成トークン数。デフォルト: 100
         additional_params (Dict[str, Any]): プロバイダー固有の追加パラメータ
-        
+
     Example:
         >>> config = ProviderConfig(
         ...     name="openai",
@@ -61,22 +61,22 @@ class ConfigError(Exception):
 class ConfigManager:
     """
     アプリケーション設定の管理を行うメインクラス。
-    
+
     YAML設定ファイルの安全な読み込み、環境変数の展開、設定値の検証、
     およびプロバイダー固有設定の管理を統合的に行います。
     セキュリティ要件に準拠したAPIキー管理と入力検証を実装。
-    
+
     Features:
         - YAML設定ファイルの読み込みと解析
         - ${VAR_NAME} 形式の環境変数展開
         - プロバイダー設定の検証
         - セキュリティを考慮した入力サニタイゼーション
         - 複数のプロバイダータイプ（API/CLI）のサポート
-    
+
     Supported Providers:
         API型: openai, anthropic, gemini
         CLI型: gcloud, gemini-cli, claude-code, gemini-native
-    
+
     Example:
         >>> manager = ConfigManager()
         >>> config = manager.load_config("config.yml")

@@ -26,7 +26,7 @@ def check_dns_resolution(hostname: str = "google.com") -> Tuple[bool, str]:
         # ホスト名の基本検証
         if not hostname or len(hostname) > 255:
             return False, f"無効なホスト名: {hostname}"
-        
+
         socket.gethostbyname(hostname)
         return True, f"DNS解決成功: {hostname}"
     except socket.gaierror as e:
@@ -80,7 +80,7 @@ def ping_test(host: str = "google.com") -> Tuple[bool, str]:
         # ホスト名の基本検証
         if not host or len(host) > 255:
             return False, f"無効なホスト名: {host}"
-        
+
         # Windows/Linux対応
         ping_cmd = ["ping", "-c", "1"] if sys.platform != "win32" else ["ping", "-n", "1"]
         ping_cmd.append(host)
@@ -135,7 +135,7 @@ def comprehensive_network_check() -> List[Tuple[str, bool, str]]:
 def print_network_status() -> bool:
     """
     ネットワーク状態を表示
-    
+
     Returns:
         全てのネットワークチェックが成功した場合True
     """

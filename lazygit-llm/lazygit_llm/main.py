@@ -32,12 +32,12 @@ from lazygit_llm.base_provider import ProviderError, AuthenticationError, Provid
 def setup_logging(verbose: bool = False) -> None:
     """
     アプリケーションのロギング設定を初期化します。
-    
+
     セキュリティを考慮した一時ログファイルの作成と、適切なログフォーマット、
     ハンドラーの設定を行います。詳細モードが有効な場合は、コンソール出力も追加します。
 
     Args:
-        verbose (bool, optional): 
+        verbose (bool, optional):
             詳細ログモード。Trueの場合、DEBUGレベルのログとコンソール出力を有効化。
             デフォルトは False。
 
@@ -45,7 +45,7 @@ def setup_logging(verbose: bool = False) -> None:
         - ログファイルは一時ディレクトリに 'lazygit-llm-*.log' 形式で作成
         - ログフォーマット: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         - ファイルエンコーディング: UTF-8
-        
+
     Security:
         - 一時ファイルは適切なファイルディスクリプタ管理で作成
         - ログファイルパスは標準エラー出力に表示(詳細モード時のみ)
@@ -55,7 +55,7 @@ def setup_logging(verbose: bool = False) -> None:
     log_fd, log_file_path = tempfile.mkstemp(prefix='lazygit-llm-', suffix='.log', text=True)
     os.close(log_fd)  # ファイルディスクリプタを閉じる
     log_file = Path(log_file_path)
-    
+
     if verbose:
         print(f"ログファイル: {log_file}", file=sys.stderr)
 
@@ -72,7 +72,7 @@ def setup_logging(verbose: bool = False) -> None:
 def parse_arguments() -> argparse.Namespace:
     """
     コマンドライン引数を解析し、アプリケーション設定を取得します。
-    
+
     サポートされる引数：
     - --config/-c: 設定ファイルパスの指定
     - --verbose/-v: 詳細ログの有効化
