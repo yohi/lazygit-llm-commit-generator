@@ -777,7 +777,7 @@ class ExampleProvider(BaseProvider):
 
 - 入力データの検証とサニタイゼーション
 - API キーの安全な管理
-- subprocess実行時のsell=False
+- subprocess実行時のshell=False
 - 出力サイズの制限
 
 ### 2. エラーハンドリング
@@ -802,5 +802,12 @@ class ExampleProvider(BaseProvider):
 - バージョン互換性の考慮
 
 ---
+
+## メタ情報
+
+- **ドキュメント**: プロバイダー実装ガイド
+- **バージョン**: 1.0.0
+- **対象者**: 開発者・拡張実装者
+- **最終更新**: 2024年12月
 
 このガイドに従って新しいプロバイダーを実装することで、LazyGit LLM Commit Generatorの機能を拡張し、より多くのLLMサービスに対応できます。

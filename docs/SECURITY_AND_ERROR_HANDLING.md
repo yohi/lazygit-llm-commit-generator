@@ -8,7 +8,7 @@ LazyGit LLM Commit Generatorは、セキュリティを最優先に設計され�
 
 ### 多層防御アプローチ
 
-```
+```text
 ┌─────────────────────────────────────┐
 │        入力検証レイヤー             │ ← 入力サニタイゼーション
 ├─────────────────────────────────────┤
@@ -557,15 +557,16 @@ class ErrorHandler:
     @staticmethod
     def log_error_with_context(error: Exception, context: Dict[str, Any]) -> None:
         """コンテキスト付きエラーログ"""
+        # 機密情報のマスキング（error_info構築前に実施）
+        safe_context = SecurityValidator.mask_sensitive_data(str(context))
+        safe_message = SecurityValidator.mask_sensitive_data(str(error))
+
         error_info = {
             'error_type': type(error).__name__,
-            'error_message': str(error),
-            'context': context,
+            'error_message': safe_message,
+            'context': safe_context,
             'timestamp': time.time(),
         }
-
-        # 機密情報のマスキング
-        safe_context = SecurityValidator.mask_sensitive_data(str(context))
 
         logger.error(f"エラー発生: {error_info}", extra={'context': safe_context})
 ```
@@ -836,5 +837,12 @@ tail -f /var/log/lazygit-llm/audit.log
 ```
 
 ---
+
+## メタ情報
+
+- **ドキュメント**: セキュリティとエラーハンドリング
+- **バージョン**: 1.0.0
+- **対象者**: 開発者・セキュリティ担当者
+- **最終更新**: 2024年12月
 
 このセキュリティとエラーハンドリングシステムにより、LazyGit LLM Commit Generatorは安全で信頼性の高い動作を実現しています。

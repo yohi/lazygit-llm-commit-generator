@@ -6,7 +6,7 @@ LazyGit LLM Commit Generatorは、Git差分からLLM（Large Language Model）�
 
 ## アーキテクチャ概要
 
-```
+```text
 main.py → ConfigManager → ProviderFactory → Provider (API/CLI)
     ↓           ↓              ↓               ↓
 GitProcessor → Config Load → Provider Create → Message Generate
@@ -326,7 +326,7 @@ Git差分の安全性を検証。
 
 #### 例外階層
 
-```
+```text
 Exception
 ├── ProviderError              # プロバイダー基底例外
 │   ├── AuthenticationError    # 認証失敗
@@ -516,5 +516,12 @@ tail -f /tmp/lazygit-llm-*.log
 4. ドキュメントの更新
 
 ---
+
+## メタ情報
+
+- **ドキュメント**: LazyGit LLM Commit Generator - 包括的API仕様書
+- **バージョン**: 1.0.0
+- **対象システム**: LazyGit LLM Commit Generator
+- **最終更新**: 2024年12月
 
 このAPI仕様書は、LazyGit LLM Commit Generatorの全機能を網羅し、開発者がシステムを理解し、拡張するための包括的なガイドです。
