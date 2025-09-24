@@ -1,7 +1,7 @@
 """
-Claude Code CLI プロバイダー
+Gemini CLI プロバイダー
 
-Anthropic Claude Code CLI を使用してClaude モデルにアクセスする。
+Google Cloud SDK (gcloud) を使用してGemini モデルにアクセスする。
 厳格なセキュリティ制御に従い、subprocess実行時の安全性を確保。
 """
 
@@ -13,65 +13,58 @@ import shutil
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 
-from ..base_provider import BaseProvider, ProviderError, AuthenticationError, TimeoutError, ResponseError
+from lazygit_llm.base_provider import BaseProvider, ProviderError, AuthenticationError, ProviderTimeoutError, ResponseError
 
 logger = logging.getLogger(__name__)
 
 
-class ClaudeCodeProvider(BaseProvider):
+class GeminiCLIProvider(BaseProvider):
     """
-    Claude Code CLIプロバイダー
+    Gemini CLIプロバイダー
 
-    Anthropic Claude Code CLI を使用してClaudeモデルにアクセス。
+    Google Cloud SDK (gcloud) を使用してGeminiモデルにアクセス。
     セキュリティ要件に従った安全なsubprocess実行を実装。
     """
 
     # セキュリティ設定
-    ALLOWED_BINARIES = ['claude-code', 'claude']
-    MAX_STDOUT_SIZE = 2 * 1024 * 1024  # 2MB（Claudeの長い出力に対応）
-    MAX_STDERR_SIZE = 1024 * 1024      # 1MB
-    DEFAULT_TIMEOUT = 45  # 45秒（Claudeは処理が重い場合がある）
-    MAX_TIMEOUT = 600     # 10分（設定可能な最大値）
+    ALLOWED_BINARIES = ['gcloud']
+    MAX_STDOUT_SIZE = 1024 * 1024  # 1MB
+    MAX_STDERR_SIZE = 1024 * 1024  # 1MB
+    DEFAULT_TIMEOUT = 30  # 30秒
+    MAX_TIMEOUT = 300     # 5分（設定可能な最大値）
 
     def __init__(self, config: Dict[str, Any]):
         """
-        Claude Code CLIプロバイダーを初期化
+        Gemini CLIプロバイダーを初期化
 
         Args:
             config: プロバイダー設定
 
         Raises:
-            ProviderError: claude-codeコマンドが利用できない場合
+            ProviderError: gcloudコマンドが利用できない場合
         """
-        # デフォルト値を設定してからsuper().__init__を呼び出し
-        config.setdefault('model_name', 'claude-3-5-sonnet-20241022')
-        config.setdefault('additional_params', {})
-        
         super().__init__(config)
 
         # 設定の検証
         if not self.validate_config():
-            raise ProviderError("Claude Code CLI設定が無効です")
+            raise ProviderError("Gemini CLI設定が無効です")
 
-        self.model = config['model_name']
+        self.model = config.get('model_name', 'gemini-1.5-pro')
 
         # 追加設定
-        additional_params = config['additional_params']
+        additional_params = config.get('additional_params', {})
+        self.project_id = additional_params.get('project_id')
+        self.location = additional_params.get('location', 'us-central1')
         self.temperature = additional_params.get('temperature', 0.3)
         self.max_output_tokens = additional_params.get('max_output_tokens', self.max_tokens)
 
-        # タイムアウト値を安全に変換
-        try:
-            timeout_value = int(config.get('timeout', self.DEFAULT_TIMEOUT))
-        except (ValueError, TypeError):
-            timeout_value = self.DEFAULT_TIMEOUT
-        
-        self.cli_timeout = min(timeout_value, self.MAX_TIMEOUT)
+        # セキュリティ設定
+        self.cli_timeout = min(config.get('timeout', self.DEFAULT_TIMEOUT), self.MAX_TIMEOUT)
 
-        # claude-codeバイナリの検証
-        self.claude_code_path = self._verify_claude_code_binary()
+        # gcloudバイナリの検証
+        self.gcloud_path = self._verify_gcloud_binary()
 
-        logger.info(f"Claude Code CLIプロバイダーを初期化: model={self.model}, claude_code_path={self.claude_code_path}")
+        logger.info(f"Gemini CLIプロバイダーを初期化: model={self.model}, gcloud_path={self.gcloud_path}")
 
     def generate_commit_message(self, diff: str, prompt_template: str) -> str:
         """
@@ -85,8 +78,8 @@ class ClaudeCodeProvider(BaseProvider):
             生成されたコミットメッセージ
 
         Raises:
-            AuthenticationError: Claude Code認証エラー
-            TimeoutError: タイムアウトエラー
+            AuthenticationError: gcloud認証エラー
+            ProviderTimeoutError: タイムアウトエラー
             ResponseError: レスポンスエラー
             ProviderError: その他のプロバイダーエラー
         """
@@ -94,43 +87,41 @@ class ClaudeCodeProvider(BaseProvider):
             raise ProviderError("空の差分が提供されました")
 
         prompt = self._format_prompt(diff, prompt_template)
-        logger.debug(f"Claude Code CLIにリクエスト送信: model={self.model}, prompt_length={len(prompt)}")
+        logger.debug(f"Gemini CLIにリクエスト送信: model={self.model}, prompt_length={len(prompt)}")
 
         try:
             start_time = time.time()
 
-            # claude-codeコマンドを実行
-            response = self._execute_claude_code_command(prompt)
+            # gcloudコマンドを実行
+            response = self._execute_gcloud_command(prompt)
 
             elapsed_time = time.time() - start_time
-            logger.info(f"Claude Code CLI呼び出し完了: {elapsed_time:.2f}秒")
+            logger.info(f"Gemini CLI呼び出し完了: {elapsed_time:.2f}秒")
 
             # レスポンスの検証
             if not self._validate_response(response):
-                raise ResponseError("Claude Code CLIから無効なレスポンスを受信しました")
+                raise ResponseError("Gemini CLIから無効なレスポンスを受信しました")
 
             return response
 
-        except (AuthenticationError, TimeoutError, ResponseError, ProviderError):
+        except (AuthenticationError, ProviderTimeoutError, ResponseError, ProviderError):
             raise
         except Exception as e:
-            logger.exception("Claude Code CLI呼び出し中にエラー")
+            logger.exception("Gemini CLI呼び出し中にエラー")
             # エラーの分類
             error_str = str(e).lower()
-            if any(keyword in error_str for keyword in ['authentication', 'login', 'auth', 'unauthorized']):
-                raise AuthenticationError("Claude Code認証エラー") from e
+            if any(keyword in error_str for keyword in ['authentication', 'login', 'credentials']):
+                raise AuthenticationError("gcloud認証エラー") from e
             elif 'timeout' in error_str:
-                raise TimeoutError("Claude Code CLIタイムアウト") from e
+                raise ProviderTimeoutError("Gemini CLIタイムアウト") from e
             elif any(keyword in error_str for keyword in ['not found', 'command not found']):
-                raise ProviderError("claude-codeコマンドが見つかりません") from e
-            elif any(keyword in error_str for keyword in ['rate limit', 'quota', 'limit exceeded']):
-                raise ProviderError("Claude Code APIレート制限") from e
+                raise ProviderError("gcloudコマンドが見つかりません") from e
             else:
-                raise ProviderError("Claude Code CLI呼び出しに失敗しました") from e
+                raise ProviderError("Gemini CLI呼び出しに失敗しました") from e
 
     def test_connection(self) -> bool:
         """
-        Claude Code CLIへの接続をテスト
+        Gemini CLIへの接続をテスト
 
         Returns:
             接続が成功した場合True
@@ -140,32 +131,32 @@ class ClaudeCodeProvider(BaseProvider):
             ProviderError: その他の接続エラー
         """
         try:
-            logger.debug("Claude Code CLI接続テストを開始")
+            logger.debug("Gemini CLI接続テストを開始")
 
             # 簡単なテストプロンプトで接続確認
-            test_prompt = "Hello, this is a connection test. Please respond with just 'OK'."
-            response = self._execute_claude_code_command(test_prompt, test_mode=True)
+            test_prompt = "Hello, this is a connection test."
+            response = self._execute_gcloud_command(test_prompt, max_output_tokens=5)
 
-            if response and 'ok' in response.strip().lower():
-                logger.info("Claude Code CLI接続テスト成功")
+            if response and response.strip():
+                logger.info("Gemini CLI接続テスト成功")
                 return True
             else:
-                logger.warning("Claude Code CLI接続テスト: 空のレスポンス")
+                logger.warning("Gemini CLI接続テスト: 空のレスポンス")
                 return False
 
         except AuthenticationError:
             # 認証エラーは再発生
             raise
         except Exception as e:
-            logger.error(f"Claude Code CLI接続テストエラー: {e}")
-            raise ProviderError(f"Claude Code CLI接続テストに失敗しました: {e}")
+            logger.error(f"Gemini CLI接続テストエラー: {e}")
+            raise ProviderError(f"Gemini CLI接続テストに失敗しました: {e}")
 
     def supports_streaming(self) -> bool:
         """
         ストリーミング出力をサポートするかどうか
 
         Returns:
-            Claude Code CLIはストリーミングをサポートしない（通常のCLI呼び出しのため）
+            CLIプロバイダーはストリーミングをサポートしない
         """
         return False
 
@@ -178,55 +169,50 @@ class ClaudeCodeProvider(BaseProvider):
         """
         return ['model_name']
 
-    def _verify_claude_code_binary(self) -> str:
+    def _verify_gcloud_binary(self) -> str:
         """
-        claude-codeバイナリの存在と安全性を検証
+        gcloudバイナリの存在と安全性を検証
 
         Returns:
-            検証されたclaude-codeバイナリのパス
+            検証されたgcloudバイナリのパス
 
         Raises:
-            ProviderError: claude-codeが見つからない、または安全でない場合
+            ProviderError: gcloudが見つからない、または安全でない場合
         """
-        # 候補となるバイナリ名
-        binary_candidates = ['claude-code', 'claude']
+        # PATH内でgcloudを検索
+        gcloud_path = None
 
         # 明示的なパスのリスト（優先順位順）
         explicit_paths = [
-            '/usr/local/bin/claude-code',
-            '/usr/bin/claude-code',
-            '/opt/claude-code/bin/claude-code',
-            '/usr/local/bin/claude',
-            '/usr/bin/claude'
+            '/usr/bin/gcloud',
+            '/usr/local/bin/gcloud',
+            '/opt/google-cloud-sdk/bin/gcloud',
+            '/snap/bin/gcloud'
         ]
-
-        claude_code_path = None
 
         # 明示的なパスを最初にチェック
         for path in explicit_paths:
             if Path(path).is_file() and os.access(path, os.X_OK):
-                claude_code_path = path
+                gcloud_path = path
                 break
 
         # 明示的なパスで見つからない場合、PATHを検索
-        if not claude_code_path:
-            for binary_name in binary_candidates:
-                candidate = shutil.which(binary_name)
-                if candidate and os.access(candidate, os.X_OK):
-                    claude_code_path = candidate
-                    break
+        if not gcloud_path:
+            candidate = shutil.which('gcloud')
+            if candidate and os.access(candidate, os.X_OK):
+                gcloud_path = candidate
 
-        if not claude_code_path:
+        if not gcloud_path:
             raise ProviderError(
-                "claude-codeコマンドが見つかりません。Claude Codeをインストールしてください。\n"
-                "インストール手順: https://claude.ai/code"
+                "gcloudコマンドが見つかりません。Google Cloud SDKをインストールしてください。\n"
+                "インストール手順: https://cloud.google.com/sdk/docs/install"
             )
 
         # バイナリの検証
-        self._verify_binary_security(claude_code_path)
+        self._verify_binary_security(gcloud_path)
 
-        logger.debug(f"claude-codeバイナリを検証: {claude_code_path}")
-        return claude_code_path
+        logger.debug(f"gcloudバイナリを検証: {gcloud_path}")
+        return gcloud_path
 
     def _verify_binary_security(self, binary_path: str) -> None:
         """
@@ -268,51 +254,93 @@ class ClaudeCodeProvider(BaseProvider):
                 raise
             raise ProviderError(f"バイナリセキュリティ検証エラー: {e}")
 
-    def _execute_claude_code_command(self, prompt: str, test_mode: bool = False) -> str:
+    def _execute_gcloud_command(self, prompt: str, max_output_tokens: Optional[int] = None) -> str:
         """
-        claude-codeコマンドを安全に実行
+        gcloudコマンドを安全に実行
 
         Args:
-            prompt: Claudeに送信するプロンプト
-            test_mode: テストモードかどうか
+            prompt: Geminiに送信するプロンプト
+            max_output_tokens: 最大出力トークン数
 
         Returns:
-            Claudeからのレスポンス
+            Geminiからのレスポンス
 
         Raises:
             ProviderError: コマンド実行エラー
             AuthenticationError: 認証エラー
-            TimeoutError: タイムアウトエラー
+            ProviderTimeoutError: タイムアウトエラー
         """
         # 入力の検証とサニタイゼーション
         sanitized_prompt = self._sanitize_input(prompt)
 
-        # コマンド引数の構築（安全な方法）
-        # プロンプトはstdinで渡すため、CLI引数としては含めない
-        cmd_args = [
-            self.claude_code_path,
-            'chat',
-            '--model', self.model,
-            '--no-interactive',
-            '--format', 'plain'
-        ]
+        # 出力トークン数の設定
+        output_tokens = max_output_tokens or self.max_output_tokens
 
-        # 注意: --max-tokens は公式でサポートされていない可能性があるため削除
-        # 必要に応じてCLIバージョンチェック後に追加を検討
+        # ARG_MAX制限対策: 大きなプロンプトの場合は一時ファイル経由
+        prompt_size = len(sanitized_prompt.encode('utf-8'))
+        use_temp_file = prompt_size > 50000  # 50KB以上
+        temp_file_path = None
+
+        if use_temp_file:
+            logger.debug(f"大きなプロンプト({prompt_size}bytes)を一時ファイル経由で処理")
+            import tempfile
+            import os
+            try:
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as temp_file:
+                    temp_file.write(sanitized_prompt)
+                    temp_file_path = temp_file.name
+
+                # コマンド引数の構築（ファイル経由）
+                cmd_args = [
+                    self.gcloud_path,
+                    'ai',
+                    'generative-models',
+                    'generate-text',
+                    f'--model={self.model}',
+                    f'--prompt-file={temp_file_path}',
+                    f'--max-output-tokens={output_tokens}',
+                    f'--temperature={self.temperature}',
+                    '--format=value(candidates[0].content.parts[0].text)',
+                    '--quiet'
+                ]
+            except Exception as e:
+                logger.warning(f"一時ファイル作成失敗、通常プロンプトにフォールバック: {e}")
+                use_temp_file = False
+
+        if not use_temp_file:
+            # コマンド引数の構築（通常方法、レスポンス形式修正済み）
+            cmd_args = [
+                self.gcloud_path,
+                'ai',
+                'generative-models',
+                'generate-text',
+                f'--model={self.model}',
+                f'--prompt={sanitized_prompt}',
+                f'--max-output-tokens={output_tokens}',
+                f'--temperature={self.temperature}',
+                '--format=value(candidates[0].content.parts[0].text)',
+                '--quiet'
+            ]
+
+        # プロジェクトIDが設定されている場合は追加
+        if self.project_id:
+            cmd_args.extend([f'--project={self.project_id}'])
+
+        # ロケーションが設定されている場合は追加
+        if self.location:
+            cmd_args.extend([f'--location={self.location}'])
 
         # 安全な環境変数の設定
         safe_env = self._create_safe_environment()
 
         try:
-            logger.debug(f"claude-codeコマンド実行: {' '.join(cmd_args[:3])}... (プロンプトはstdin経由)")
+            logger.debug(f"gcloudコマンド実行: {' '.join(cmd_args[:3])}... (引数は安全にマスク)")
 
             # subprocess実行（セキュリティ要件に準拠）
             result = subprocess.run(
                 cmd_args,
-                input=sanitized_prompt,  # プロンプトをstdinに渡す
                 capture_output=True,
                 text=True,
-                encoding='utf-8',  # 明示的にエンコーディングを指定
                 timeout=self.cli_timeout,
                 env=safe_env,
                 shell=False,  # 重要: shell=False を使用
@@ -328,35 +356,40 @@ class ClaudeCodeProvider(BaseProvider):
                 error_msg = stderr.strip() or "不明なエラー"
 
                 # 認証エラーの検出
-                if any(keyword in error_msg.lower() for keyword in ['login', 'authentication', 'auth', 'unauthorized']):
-                    raise AuthenticationError(f"Claude Code認証が必要です: {error_msg}")
-
-                # レート制限エラーの検出
-                if any(keyword in error_msg.lower() for keyword in ['rate limit', 'quota', 'limit exceeded']):
-                    raise ProviderError(f"Claude Code APIレート制限に達しました: {error_msg}")
+                if any(keyword in error_msg.lower() for keyword in ['login', 'authentication', 'credentials']):
+                    raise AuthenticationError(f"gcloud認証が必要です: {error_msg}")
 
                 # その他のエラー
-                raise ProviderError(f"claude-codeコマンドが失敗しました (exit code: {result.returncode}): {error_msg}")
+                raise ProviderError(f"gcloudコマンドが失敗しました (exit code: {result.returncode}): {error_msg}")
 
             # レスポンスの処理
             response = stdout.strip()
             if not response:
-                raise ResponseError("claude-codeから空のレスポンスを受信しました")
+                raise ResponseError("gcloudから空のレスポンスを受信しました")
 
             # 安全メタデータのみログ出力（内容は記録しない）
-            logger.info(f"claude-codeコマンド成功: exit_code={result.returncode}, response_length={len(response)}")
+            logger.info(f"gcloudコマンド成功: exit_code={result.returncode}, response_length={len(response)}")
 
             return response
 
-        except subprocess.TimeoutExpired as e:
-            logger.exception("claude-codeコマンドがタイムアウトしました: %s 秒", self.cli_timeout)
-            raise TimeoutError("claude-codeコマンドがタイムアウトしました") from e
+        except subprocess.TimeoutExpired:
+            logger.error(f"gcloudコマンドがタイムアウトしました: {self.cli_timeout}秒")
+            raise ProviderTimeoutError(f"gcloudコマンドがタイムアウトしました（{self.cli_timeout}秒）")
 
         except Exception as e:
-            if isinstance(e, (AuthenticationError, TimeoutError, ProviderError)):
+            if isinstance(e, (AuthenticationError, ProviderTimeoutError, ProviderError)):
                 raise
-            logger.exception("claude-codeコマンド実行中に予期しないエラー")
-            raise ProviderError("claude-codeコマンド実行に失敗しました") from e
+            logger.error(f"gcloudコマンド実行中に予期しないエラー: {e}")
+            raise ProviderError(f"gcloudコマンド実行に失敗しました: {e}")
+
+        finally:
+            # 一時ファイルのクリーンアップ
+            if temp_file_path and os.path.exists(temp_file_path):
+                try:
+                    os.unlink(temp_file_path)
+                    logger.debug(f"一時ファイルを削除: {temp_file_path}")
+                except Exception as e:
+                    logger.warning(f"一時ファイル削除失敗: {temp_file_path}, {e}")
 
     def _sanitize_input(self, input_text: str) -> str:
         """
@@ -374,13 +407,14 @@ class ClaudeCodeProvider(BaseProvider):
         # 基本的なサニタイゼーション
         sanitized = input_text.strip()
 
+        # 危険な文字の除去
         # シェル未使用のため制御文字に限定
         dangerous_chars = ['\x00']
         for char in dangerous_chars:
             sanitized = sanitized.replace(char, '')
 
-        # 長さ制限（Claudeは長いコンテキストを扱えるため、より大きな制限）
-        max_prompt_length = 100000  # 100KB制限
+        # 長さ制限
+        max_prompt_length = 50000  # 50KB制限
         if len(sanitized) > max_prompt_length:
             sanitized = sanitized[:max_prompt_length]
             logger.warning(f"プロンプトが長すぎるため切り詰めました: {len(input_text)} -> {len(sanitized)}")
@@ -399,8 +433,10 @@ class ClaudeCodeProvider(BaseProvider):
             'PATH',
             'HOME',
             'USER',
-            'CLAUDE_API_KEY',
-            'ANTHROPIC_API_KEY',
+            'GOOGLE_APPLICATION_CREDENTIALS',
+            'CLOUDSDK_CORE_PROJECT',
+            'CLOUDSDK_COMPUTE_REGION',
+            'CLOUDSDK_COMPUTE_ZONE',
             'LANG',
             'LC_ALL',
             'NO_COLOR'
@@ -458,19 +494,20 @@ class ClaudeCodeProvider(BaseProvider):
             モデル情報の辞書
         """
         return {
-            'provider': 'claude-code',
+            'provider': 'gemini-cli',
             'model': self.model,
             'supports_streaming': False,
             'max_output_tokens': self.max_output_tokens,
             'temperature': self.temperature,
-            'claude_code_path': self.claude_code_path,
+            'project_id': self.project_id,
+            'location': self.location,
+            'gcloud_path': self.gcloud_path,
             'timeout': self.cli_timeout,
             'security_features': [
                 'subprocess_shell_false',
                 'input_sanitization',
                 'output_size_limits',
                 'safe_environment',
-                'binary_verification',
-                'enhanced_auth_detection'
+                'binary_verification'
             ]
         }

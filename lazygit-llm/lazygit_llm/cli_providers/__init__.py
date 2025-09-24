@@ -49,5 +49,33 @@ def get_provider_class(name: str) -> Type[BaseProvider] | None:
     return CLI_PROVIDERS.get(name.strip().lower())
 
 
+# プロバイダーを自動登録
+def _auto_register_providers():
+    """利用可能なCLIプロバイダーを自動登録"""
+    try:
+        from .gemini_cli_provider import GeminiCLIProvider
+        register_provider('gemini-cli', GeminiCLIProvider)
+        logger.debug("Gemini CLI プロバイダーを登録しました")
+    except ImportError as e:
+        logger.debug("Gemini CLI プロバイダーの登録をスキップ: %s", e)
+
+    try:
+        from .claude_code_provider import ClaudeCodeProvider
+        register_provider('claude-code', ClaudeCodeProvider)
+        logger.debug("Claude Code プロバイダーを登録しました")
+    except ImportError as e:
+        logger.debug("Claude Code プロバイダーの登録をスキップ: %s", e)
+
+    try:
+        from .gemini_native_cli_provider import GeminiNativeCLIProvider
+        register_provider('gemini-native', GeminiNativeCLIProvider)
+        logger.debug("Gemini Native CLI プロバイダーを登録しました")
+    except ImportError as e:
+        logger.debug("Gemini Native CLI プロバイダーの登録をスキップ: %s", e)
+
+
+# プロバイダーを自動登録
+_auto_register_providers()
+
 # 公開シンボルを明示
 __all__ = ["register_provider", "get_available_providers", "get_provider_class", "CLI_PROVIDERS"]

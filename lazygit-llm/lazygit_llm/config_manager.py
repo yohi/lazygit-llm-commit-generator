@@ -56,6 +56,7 @@ class ConfigManager:
             'gemini-api': {'type': 'api', 'required_fields': ['api_key', 'model_name']},
             'gemini-cli': {'type': 'cli', 'required_fields': ['model_name']},
             'claude-code': {'type': 'cli', 'required_fields': ['model_name']},
+            'gemini-native': {'type': 'cli', 'required_fields': []},
         }
 
     def load_config(self, config_path: str) -> Dict[str, Any]:
