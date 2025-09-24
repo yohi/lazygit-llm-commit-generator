@@ -213,7 +213,7 @@ from .new_provider import NewProvider  # 追加
 PROVIDER_CLASSES = {
     'openai': OpenAIProvider,
     'anthropic': AnthropicProvider,
-    'gemini-api': GeminiAPIProvider,
+    'gemini': GeminiAPIProvider,
     'new-provider': NewProvider,  # 追加
 }
 
