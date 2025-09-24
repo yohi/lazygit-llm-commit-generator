@@ -10,7 +10,7 @@ import logging
 import time
 import os
 import shutil
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, ClassVar
 from pathlib import Path
 
 from lazygit_llm.base_provider import BaseProvider, ProviderError, AuthenticationError, ProviderTimeoutError, ResponseError
@@ -27,11 +27,11 @@ class ClaudeCodeProvider(BaseProvider):
     """
 
     # セキュリティ設定
-    ALLOWED_BINARIES = ['claude-code', 'claude']
-    MAX_STDOUT_SIZE = 2 * 1024 * 1024  # 2MB（Claudeの長い出力に対応）
-    MAX_STDERR_SIZE = 1024 * 1024      # 1MB
-    DEFAULT_TIMEOUT = 45  # 45秒（Claudeは処理が重い場合がある）
-    MAX_TIMEOUT = 600     # 10分（設定可能な最大値）
+    ALLOWED_BINARIES: ClassVar[tuple[str, ...]] = ('claude-code', 'claude')
+    MAX_STDOUT_SIZE: ClassVar[int] = 2 * 1024 * 1024  # 2MB（Claudeの長い出力に対応）
+    MAX_STDERR_SIZE: ClassVar[int] = 1024 * 1024      # 1MB
+    DEFAULT_TIMEOUT: ClassVar[int] = 45  # 45秒（Claudeは処理が重い場合がある）
+    MAX_TIMEOUT: ClassVar[int] = 600     # 10分（設定可能な最大値）
 
     def __init__(self, config: Dict[str, Any]):
         """

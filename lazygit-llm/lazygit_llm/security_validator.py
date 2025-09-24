@@ -1,3 +1,4 @@
+# ruff: noqa: RUF002, RUF003
 """
 セキュリティ・バリデーション機能
 
@@ -15,7 +16,6 @@ from typing import Dict, Any, Optional, List, Tuple, ClassVar
 from pathlib import Path
 from dataclasses import dataclass
 # from functools import lru_cache  # インスタンスメソッドのメモリリーク回避のため削除
-from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -77,19 +77,16 @@ class SecurityValidator:
         r'[0-9a-fA-F]{32,}',          # Hexエンコード
     ]
 
-    def __init__(self, enable_caching: bool = True, enable_parallel_processing: bool = True):
+    def __init__(self, enable_caching: bool = True):
         """セキュリティバリデーターを初期化
 
         Args:
             enable_caching: キャッシュを有効にするかどうか
-            enable_parallel_processing: 並行処理を有効にするかどうか
         """
         self.max_input_size = 1024 * 1024  # 1MB
         self.max_diff_size = 500 * 1024    # 500KB
         self.enable_caching = enable_caching
-        self.enable_parallel_processing = enable_parallel_processing
         self._cache_lock = threading.Lock()
-        self._executor = ThreadPoolExecutor(max_workers=2) if enable_parallel_processing else None
         self._processing_stats = {
             'total_validations': 0,
             'cache_hits': 0,
@@ -861,8 +858,7 @@ class SecurityValidator:
         """
         デストラクタ: リソースのクリーンアップ
         """
-        if hasattr(self, '_executor') and self._executor:
-            self._executor.shutdown(wait=True)
+        pass
 
     def get_security_recommendations(self) -> List[str]:
         """
