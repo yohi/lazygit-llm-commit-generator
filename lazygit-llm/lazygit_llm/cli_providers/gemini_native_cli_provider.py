@@ -173,7 +173,7 @@ class GeminiNativeCLIProvider(BaseProvider):
         # ARG_MAX制限対策: 大きなプロンプトは常にstdin経由
         prompt_size = len(prompt.encode('utf-8'))
         use_stdin = prompt_size > 8192  # 8KB以上は確実にstdin経由
-        
+
         if use_stdin:
             logger.debug(f"大きなプロンプト({prompt_size}bytes)をstdin経由で処理")
             # コマンド構築（stdinでプロンプトを渡す）

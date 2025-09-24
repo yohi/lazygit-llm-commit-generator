@@ -276,12 +276,12 @@ class GeminiCLIProvider(BaseProvider):
 
         # 出力トークン数の設定
         output_tokens = max_output_tokens or self.max_output_tokens
-        
+
         # ARG_MAX制限対策: 大きなプロンプトの場合は一時ファイル経由
         prompt_size = len(sanitized_prompt.encode('utf-8'))
         use_temp_file = prompt_size > 50000  # 50KB以上
         temp_file_path = None
-        
+
         if use_temp_file:
             logger.debug(f"大きなプロンプト({prompt_size}bytes)を一時ファイル経由で処理")
             import tempfile
@@ -290,7 +290,7 @@ class GeminiCLIProvider(BaseProvider):
                 with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as temp_file:
                     temp_file.write(sanitized_prompt)
                     temp_file_path = temp_file.name
-                
+
                 # コマンド引数の構築（ファイル経由）
                 cmd_args = [
                     self.gcloud_path,
@@ -307,7 +307,7 @@ class GeminiCLIProvider(BaseProvider):
             except Exception as e:
                 logger.warning(f"一時ファイル作成失敗、通常プロンプトにフォールバック: {e}")
                 use_temp_file = False
-        
+
         if not use_temp_file:
             # コマンド引数の構築（通常方法、レスポンス形式修正済み）
             cmd_args = [
@@ -382,7 +382,7 @@ class GeminiCLIProvider(BaseProvider):
                 raise
             logger.error(f"gcloudコマンド実行中に予期しないエラー: {e}")
             raise ProviderError(f"gcloudコマンド実行に失敗しました: {e}")
-        
+
         finally:
             # 一時ファイルのクリーンアップ
             if temp_file_path and os.path.exists(temp_file_path):
