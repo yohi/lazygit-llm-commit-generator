@@ -73,15 +73,15 @@ def parse_arguments() -> argparse.Namespace:
     """
     コマンドライン引数を解析し、アプリケーション設定を取得します。
 
-    サポートされる引数：
+    サポートされる引数:
     - --config/-c: 設定ファイルパスの指定
     - --verbose/-v: 詳細ログの有効化
-    - --test-config: 設定テストモード（設定のみテストして終了）
+    - --test-config: 設定テストモード(設定のみテストして終了)
     - --version: バージョン情報表示
 
     Returns:
         argparse.Namespace: 解析されたコマンドライン引数のNamespaceオブジェクト。
-            以下の属性を含む：
+            以下の属性を含む:
             - config (str): 設定ファイルパス
             - verbose (bool): 詳細ログフラグ
             - test_config (bool): 設定テストフラグ
