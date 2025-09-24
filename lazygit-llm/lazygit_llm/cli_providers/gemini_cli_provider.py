@@ -9,7 +9,6 @@ import subprocess
 import logging
 import time
 import os
-import hashlib
 import shutil
 from typing import Dict, Any, Optional, List
 from pathlib import Path
@@ -301,7 +300,7 @@ class GeminiCLIProvider(BaseProvider):
                     f'--prompt-file={temp_file_path}',
                     f'--max-output-tokens={output_tokens}',
                     f'--temperature={self.temperature}',
-                    '--format=value(candidates[0].content.parts[0])',
+                    '--format=value(candidates[0].content.parts[0].text)',
                     '--quiet'
                 ]
             except Exception as e:
@@ -319,7 +318,7 @@ class GeminiCLIProvider(BaseProvider):
                 f'--prompt={sanitized_prompt}',
                 f'--max-output-tokens={output_tokens}',
                 f'--temperature={self.temperature}',
-                '--format=value(candidates[0].content.parts[0])',
+                '--format=value(candidates[0].content.parts[0].text)',
                 '--quiet'
             ]
 
