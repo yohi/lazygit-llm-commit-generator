@@ -108,7 +108,7 @@ pipx install uv
 
 ```yaml
 # プロバイダー指定
-provider: "openai"  # openai, anthropic, gemini-api, gemini-cli, claude-code
+provider: "openai"  # openai, anthropic, gemini, gcloud, gemini-cli, claude-code
 
 # APIキー（環境変数参照推奨）
 api_key: "${OPENAI_API_KEY}"

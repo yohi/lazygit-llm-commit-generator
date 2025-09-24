@@ -101,7 +101,7 @@ additional_params:
 
 #### 設定例
 ```yaml
-provider: "gemini-api"
+provider: "gemini"
 model_name: "gemini-1.5-pro"
 api_key: "${GOOGLE_API_KEY}"
 additional_params:
@@ -127,7 +127,7 @@ model_name: "claude-3-5-sonnet-20241022"
 
 #### 設定例
 ```yaml
-provider: "gemini-cli"
+provider: "gcloud"
 model_name: "gemini-1.5-pro"
 additional_params:
   project_id: "your-gcp-project-id"
@@ -221,7 +221,7 @@ except ProviderError as e:
 
 ```yaml
 # プロバイダー指定 (必須)
-provider: "openai"  # openai, anthropic, gemini-api, gemini-cli, claude-code
+provider: "openai"  # openai, anthropic, gemini, gcloud, gemini-cli, claude-code
 
 # モデル名 (必須)
 model_name: "gpt-4"
