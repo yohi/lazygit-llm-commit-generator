@@ -532,7 +532,7 @@ class TestSecurity:
         # APIキーを含む差分
         diff_with_api_key = """
         diff --git a/config.py b/config.py
-        +API_KEY = "sk-1234567890abcdef"
+        +API_KEY = "sk-..."
         +PASSWORD = "secret123"
         """
         

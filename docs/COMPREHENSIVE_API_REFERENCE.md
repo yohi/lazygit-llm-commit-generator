@@ -309,7 +309,7 @@ Git差分の安全性を検証。
 
 **検証項目**:
 - サイズ制限（50KB）
-- 機密情報の検出（API키、パスワード）
+- 機密情報の検出（APIキー、パスワード）
 - 不正文字の検出
 
 ##### `sanitize_prompt(prompt: str) -> str`
@@ -419,7 +419,7 @@ prompt_template: |
   Based on the following git diff, generate a concise commit message
   that follows conventional commits format:
 
-  $diff
+  {diff}
 
   Generate only the commit message, no additional text.
 
@@ -435,7 +435,7 @@ additional_params:
 prompt_template: |
   以下のgit diffに基づいて、簡潔で分かりやすいコミットメッセージを日本語で生成してください：
 
-  $diff
+  {diff}
 
   コミットメッセージのみを出力してください。
 ```

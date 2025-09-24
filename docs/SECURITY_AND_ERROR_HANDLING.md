@@ -107,7 +107,7 @@ class SecurityValidator:
         masked_content = content
 
         for pattern in SecurityValidator.SENSITIVE_PATTERNS:
-            masked_content = re.sub(pattern, '[MASKED]', masked_content, flags=re.MULTILINE)
+            masked_content = re.sub(pattern, '[MASKED]', masked_content, flags=re.MULTILINE | re.IGNORECASE)
 
         return masked_content
 
@@ -140,21 +140,18 @@ class InputValidator:
         if not path or not isinstance(path, str):
             return False
 
-        # パス正規化
+        # パス正規化（実体パス解決）
         normalized_path = os.path.normpath(os.path.expanduser(path))
+        resolved_path = os.path.realpath(normalized_path)
 
-        # ディレクトリトラバーサル防止
-        if '..' in normalized_path:
-            logger.warning(f"危険なパス: {path}")
-            return False
-
-        # 許可されたディレクトリのみ
+        # 許可されたディレクトリのみ（厳密な包含関係チェック）
         allowed_dirs = [
             os.path.expanduser('~/.config/lazygit-llm'),
             os.getcwd(),
         ]
 
-        if not any(normalized_path.startswith(allowed_dir) for allowed_dir in allowed_dirs):
+        if not any(os.path.commonpath([resolved_path, os.path.realpath(allowed_dir)]) 
+                   == os.path.realpath(allowed_dir) for allowed_dir in allowed_dirs):
             logger.warning(f"許可されていないディレクトリ: {path}")
             return False
 
@@ -580,14 +577,21 @@ class SecurityLogger:
     def __init__(self):
         self.security_logger = logging.getLogger('security')
 
-        # セキュリティログの設定
-        handler = logging.FileHandler('/var/log/lazygit-llm/security.log')
-        formatter = logging.Formatter(
-            '%(asctime)s - SECURITY - %(levelname)s - %(message)s'
-        )
-        handler.setFormatter(formatter)
-        self.security_logger.addHandler(handler)
-        self.security_logger.setLevel(logging.WARNING)
+        # セキュリティログの設定（重複追加防止＆ローテーション）
+        if not self.security_logger.handlers:
+            try:
+                os.makedirs('/var/log/lazygit-llm', exist_ok=True)
+                handler = logging.handlers.RotatingFileHandler(
+                    '/var/log/lazygit-llm/security.log', maxBytes=5_000_000, backupCount=3, encoding='utf-8'
+                )
+            except Exception:
+                # フォールバック（パス権限問題など）
+                handler = logging.StreamHandler()
+            formatter = logging.Formatter('%(asctime)s - SECURITY - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+            self.security_logger.addHandler(handler)
+            self.security_logger.setLevel(logging.WARNING)
+            self.security_logger.propagate = False
 
     @staticmethod
     def log_authentication_failure(provider: str, error_details: str) -> None:
@@ -624,13 +628,19 @@ class AuditLogger:
     def __init__(self):
         self.audit_logger = logging.getLogger('audit')
 
-        # 監査ログの設定
-        handler = logging.FileHandler('/var/log/lazygit-llm/audit.log')
-        formatter = logging.Formatter(
-            '%(asctime)s - AUDIT - %(levelname)s - %(message)s'
-        )
-        handler.setFormatter(formatter)
-        self.audit_logger.addHandler(handler)
+        # 監査ログの設定（重複追加防止＆ローテーション）
+        if not self.audit_logger.handlers:
+            try:
+                os.makedirs('/var/log/lazygit-llm', exist_ok=True)
+                handler = logging.handlers.RotatingFileHandler(
+                    '/var/log/lazygit-llm/audit.log', maxBytes=5_000_000, backupCount=3, encoding='utf-8'
+                )
+            except Exception:
+                handler = logging.StreamHandler()
+            formatter = logging.Formatter('%(asctime)s - AUDIT - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+            self.audit_logger.addHandler(handler)
+            self.audit_logger.propagate = False
 
     def log_api_request(self, provider: str, model: str, request_size: int) -> None:
         """API リクエストの監査ログ"""
@@ -761,6 +771,7 @@ class SecurityChecker:
         api_keys = {
             'OPENAI_API_KEY': os.getenv('OPENAI_API_KEY'),
             'ANTHROPIC_API_KEY': os.getenv('ANTHROPIC_API_KEY'),
+            'GOOGLE_API_KEY': os.getenv('GOOGLE_API_KEY'),
         }
 
         for key_name, key_value in api_keys.items():
@@ -787,7 +798,7 @@ class SecurityChecker:
 
 #### 1. 設定ファイル権限エラー
 
-```
+```text
 ERROR: 設定ファイルの権限が不適切です
 ```
 
@@ -798,7 +809,7 @@ chmod 600 ~/.config/lazygit-llm/config.yml
 
 #### 2. APIキー形式エラー
 
-```
+```text
 ERROR: APIキーの形式が無効です
 ```
 
@@ -809,7 +820,7 @@ ERROR: APIキーの形式が無効です
 
 #### 3. バイナリ検証エラー
 
-```
+```text
 ERROR: 許可されていないバイナリパス
 ```
 
