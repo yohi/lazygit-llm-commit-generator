@@ -30,9 +30,9 @@ def check_dns_resolution(hostname: str = "google.com") -> Tuple[bool, str]:
         socket.gethostbyname(hostname)
         return True, f"DNS解決成功: {hostname}"
     except socket.gaierror as e:
-        return False, f"DNS解決失敗: {hostname} ({str(e)})"
-    except Exception as e:
-        return False, f"DNS解決エラー: {hostname} (予期しないエラー)"
+        return False, f"DNS解決失敗: {hostname} ({e!s})"
+    except (UnicodeError, ValueError):
+        return False, f"DNS解決エラー: {hostname} (無効なホスト名形式)"
 
 
 def check_internet_connectivity(host: str = "8.8.8.8", port: int = 53, timeout: int = 3) -> Tuple[bool, str]:
@@ -48,12 +48,12 @@ def check_internet_connectivity(host: str = "8.8.8.8", port: int = 53, timeout: 
         (成功/失敗, メッセージ)
     """
     try:
-        socket.setdefaulttimeout(timeout)
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(timeout)
             sock.connect((host, port))
         return True, f"インターネット接続確認済み: {host}:{port}"
     except socket.error as e:
-        return False, f"インターネット接続失敗: {host}:{port} ({str(e)})"
+        return False, f"インターネット接続失敗: {host}:{port} ({e!s})"
 
 
 def check_google_api_connectivity() -> Tuple[bool, str]:

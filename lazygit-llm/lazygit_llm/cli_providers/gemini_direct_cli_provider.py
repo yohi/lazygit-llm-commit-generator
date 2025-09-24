@@ -1,5 +1,5 @@
 """
-Gemini CLI プロバイダー（ダイレクト gemini コマンド使用）
+Gemini CLI プロバイダー (ダイレクト gemini コマンド使用)
 
 ローカルの gemini コマンドを直接使用してGeminiモデルにアクセスする。
 厳格なセキュリティ制御に従い、subprocess実行時の安全性を確保。
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class GeminiDirectCLIProvider(BaseProvider):
     """
-    Gemini CLI プロバイダー（gemini コマンド直接使用）
+    Gemini CLI プロバイダー (gemini コマンド直接使用)
 
     ローカルの gemini コマンドを使用してGeminiモデルにアクセス。
     セキュリティ要件に従った安全なsubprocess実行を実装。
@@ -32,7 +32,7 @@ class GeminiDirectCLIProvider(BaseProvider):
     MAX_STDOUT_SIZE: ClassVar[int] = 1024 * 1024  # 1MB
     MAX_STDERR_SIZE: ClassVar[int] = 1024 * 1024  # 1MB
     DEFAULT_TIMEOUT: ClassVar[int] = 30  # 30秒
-    MAX_TIMEOUT: ClassVar[int] = 300     # 5分（設定可能な最大値）
+    MAX_TIMEOUT: ClassVar[int] = 300     # 5分 (設定可能な最大値)
 
     def __init__(self, config: Dict[str, Any]):
         """
@@ -57,10 +57,10 @@ class GeminiDirectCLIProvider(BaseProvider):
         self.temperature = additional_params.get('temperature', 0.3)
         self.max_output_tokens = additional_params.get('max_output_tokens', self.max_tokens)
 
-        # APIキーはオプション（geminiコマンドが認証済みの場合は不要）
+        # APIキーはオプション (geminiコマンドが認証済みの場合は不要)
         self.api_key = additional_params.get('api_key') or config.get('api_key')
         if self.api_key:
-            logger.debug("APIキーが設定されています（環境変数として使用）")
+            logger.debug("APIキーが設定されています (環境変数として使用)")
         else:
             logger.debug("APIキーなし - geminiコマンドの認証情報を使用します")
 
@@ -118,7 +118,7 @@ class GeminiDirectCLIProvider(BaseProvider):
 
             # エラーの種類に応じた詳細なメッセージ
             if "quota exceeded" in stderr_output.lower() or "429" in stderr_output or "rate limit" in stderr_output.lower():
-                raise ProviderError(f"Gemini APIクォータ制限: 1日あたりのリクエスト制限に達しました\n明日再試行するか、別のプロバイダー（openai、anthropic）をご利用ください") from e
+                raise ProviderError("Gemini APIクォータ制限: 1日あたりのリクエスト制限に達しました\n明日再試行するか、別のプロバイダー (openai、anthropic) をご利用ください") from e
             elif "authentication" in stderr_output.lower() or "api key" in stderr_output.lower():
                 raise AuthenticationError("Gemini CLI認証エラー: APIキーまたは認証設定を確認してください") from e
             elif "network" in stderr_output.lower() or "connection" in stderr_output.lower() or "connectivity" in stderr_output.lower():
@@ -165,7 +165,7 @@ class GeminiDirectCLIProvider(BaseProvider):
 
         Args:
             prompt: 送信するプロンプト
-            timeout: タイムアウト秒数（未指定時はデフォルト値を使用）
+            timeout: タイムアウト秒数 (未指定時はデフォルト値を使用)
 
         Returns:
             Geminiからのレスポンス
@@ -187,66 +187,53 @@ class GeminiDirectCLIProvider(BaseProvider):
             return self._execute_with_args(prompt, timeout)
 
     def _execute_with_tempfile(self, prompt: str, timeout: int) -> str:
-        """一時ファイルを使用してgeminiコマンドを実行"""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
-            temp_file.write(prompt)
-            temp_file_path = temp_file.name
+        """大きなプロンプトはstdin経由で安全に実行"""
+        cmd = [self.gemini_path]
 
-        try:
-            # このgemini CLIの場合、ファイル経由ではなくstdin経由を使用
-            cmd = [self.gemini_path]
+        # モデル指定 (--modelまたは-mオプション)
+        if self.model != 'gemini-1.5-pro':
+            cmd.extend(['-m', self.model])
 
-            # モデル指定（--modelまたは-mオプション）
-            if self.model != 'gemini-1.5-pro':
-                cmd.extend(['-m', self.model])
+        # 環境変数設定 (APIキーがある場合)
+        env = os.environ.copy()
+        if self.api_key:
+            env['GEMINI_API_KEY'] = self.api_key
+            env['GOOGLE_API_KEY'] = self.api_key
 
-            # 環境変数設定（APIキーがある場合）
-            env = os.environ.copy()
-            if self.api_key:
-                env['GEMINI_API_KEY'] = self.api_key
-                env['GOOGLE_API_KEY'] = self.api_key
-                env['OPENAI_API_KEY'] = self.api_key  # このgemini CLIがOpenAIも使用する可能性
+        size_bytes = len(prompt.encode('utf-8'))
+        logger.debug(f"大きなプロンプト({size_bytes} bytes)をstdin経由で実行")
 
-            logger.debug(f"大きなプロンプト({len(prompt)}bytes)をstdin経由で実行")
+        result = subprocess.run(
+            cmd,
+            input=prompt,  # stdin経由でプロンプト送信
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=env,
+            check=False
+        )
 
-            result = subprocess.run(
-                cmd,
-                input=prompt,  # stdin経由でプロンプト送信
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                env=env,
-                check=False
-            )
+        if result.returncode != 0:
+            # より詳細なエラー情報を提供
+            stderr_msg = result.stderr.strip() if result.stderr else "不明なエラー"
+            logger.error(f"geminiコマンド実行失敗: returncode={result.returncode}, stderr={stderr_msg}")
+            raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
 
-            if result.returncode != 0:
-                # より詳細なエラー情報を提供
-                stderr_msg = result.stderr.strip() if result.stderr else "不明なエラー"
-                logger.error(f"geminiコマンド実行失敗: returncode={result.returncode}, stderr={stderr_msg}")
-                raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
-
-            return result.stdout
-
-        finally:
-            # 一時ファイルを削除
-            try:
-                os.unlink(temp_file_path)
-            except OSError:
-                pass
+        return result.stdout
 
     def _execute_with_args(self, prompt: str, timeout: int) -> str:
         """コマンド引数でgeminiコマンドを実行"""
         # このgemini CLIの実際の引数構造に合わせて構築
         cmd = [self.gemini_path]
 
-        # モデル指定（--modelまたは-mオプション）
+        # モデル指定 (--modelまたは-mオプション)
         if self.model != 'gemini-1.5-pro':
             cmd.extend(['-m', self.model])
 
         # プロンプト指定（--prompt を使用）
         cmd.extend(['--prompt', prompt])
 
-        # 環境変数設定（APIキーがある場合）
+        # 環境変数設定 (APIキーがある場合)
         env = os.environ.copy()
         if self.api_key:
             env['GEMINI_API_KEY'] = self.api_key

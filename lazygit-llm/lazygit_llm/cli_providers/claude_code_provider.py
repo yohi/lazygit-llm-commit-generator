@@ -29,10 +29,10 @@ class ClaudeCodeProvider(BaseProvider):
 
     # セキュリティ設定
     ALLOWED_BINARIES: ClassVar[tuple[str, ...]] = ('claude-code', 'claude')
-    MAX_STDOUT_SIZE: ClassVar[int] = 2 * 1024 * 1024  # 2MB（Claudeの長い出力に対応）
+    MAX_STDOUT_SIZE: ClassVar[int] = 2 * 1024 * 1024  # 2MB (Claudeの長い出力に対応)
     MAX_STDERR_SIZE: ClassVar[int] = 1024 * 1024      # 1MB
-    DEFAULT_TIMEOUT: ClassVar[int] = 45  # 45秒（Claudeは処理が重い場合がある）
-    MAX_TIMEOUT: ClassVar[int] = 600     # 10分（設定可能な最大値）
+    DEFAULT_TIMEOUT: ClassVar[int] = 45  # 45秒 (Claudeは処理が重い場合がある)
+    MAX_TIMEOUT: ClassVar[int] = 600     # 10分 (設定可能な最大値)
 
     def __init__(self, config: Dict[str, Any]):
         """
@@ -110,7 +110,7 @@ class ClaudeCodeProvider(BaseProvider):
             elapsed_time = time.time() - start_time
             logger.info(f"Claude Code CLI呼び出し完了: {elapsed_time:.2f}秒")
 
-            # レスポンスの検証（最小限）
+            # レスポンスの検証 (最小限)
             if not response or not response.strip():
                 raise ResponseError("Claude Code CLIから無効なレスポンスを受信しました")
 
@@ -170,7 +170,7 @@ class ClaudeCodeProvider(BaseProvider):
         ストリーミング出力をサポートするかどうか
 
         Returns:
-            Claude Code CLIはストリーミングをサポートしない（通常のCLI呼び出しのため）
+            Claude Code CLIはストリーミングをサポートしない (通常のCLI呼び出しのため)
         """
         return False
 
@@ -196,7 +196,7 @@ class ClaudeCodeProvider(BaseProvider):
         # 候補となるバイナリ名
         binary_candidates = ['claude-code', 'claude']
 
-        # 明示的なパスのリスト（優先順位順）
+        # 明示的なパスのリスト (優先順位順)
         explicit_paths = [
             '/usr/local/bin/claude-code',
             '/usr/bin/claude-code',
@@ -252,7 +252,7 @@ class ClaudeCodeProvider(BaseProvider):
             if not os.access(binary_path, os.X_OK):
                 raise ProviderError(f"バイナリに実行権限がありません: {binary_path}")
 
-            # パスの正規化（シンボリックリンクの解決）
+            # パスの正規化 (シンボリックリンクの解決)
             resolved = Path(binary_path).resolve()
             resolved_path = str(resolved)
 
@@ -292,17 +292,19 @@ class ClaudeCodeProvider(BaseProvider):
             if not is_safe_directory:
                 raise ProviderError("安全でないディレクトリが検出されました")
 
-            # ファイル所有者とパーミッションの検証
+            # ファイル所有者とパーミッションの検証 (Windows互換)
             try:
                 stat_info = resolved.stat()
+                mode = stat_info.st_mode
                 # 他のユーザーが書き込み可能でないことを確認
-                if stat_info.st_mode & 0o002:  # world-writable
-                    raise ProviderError(f"バイナリが誰でも書き込み可能です: {resolved_path}")
-                # グループが書き込み可能でrootまたは現在のユーザー所有でない場合
-                if (stat_info.st_mode & 0o020 and
-                    stat_info.st_uid != 0 and stat_info.st_uid != os.getuid()):
-                    raise ProviderError(f"バイナリの権限が安全ではありません: {resolved_path}")
-            except OSError as e:
+                if mode & 0o002:  # world-writable
+                    raise ProviderError("バイナリが誰でも書き込み可能です")
+                # グループ書き込み可能の場合の追加検査 (POSIXのみ)
+                if (mode & 0o020) and hasattr(os, "getuid"):
+                    current_uid = os.getuid()
+                    if stat_info.st_uid != 0 and stat_info.st_uid != current_uid:
+                        raise ProviderError("バイナリの権限が安全ではありません")
+            except (OSError, AttributeError) as e:
                 logger.warning(f"ファイル権限の検証をスキップ: {e}")
 
             logger.debug(f"バイナリセキュリティ検証完了: {resolved_path}")
@@ -374,7 +376,7 @@ class ClaudeCodeProvider(BaseProvider):
         # コマンド引数の構築
         cmd_args = base_args.copy()
 
-        # chatコマンドが利用可能かチェック（claude-codeの場合）
+        # chatコマンドが利用可能かチェック (claude-codeの場合)
         if 'chat' in help_lower or binary_name in ['claude-code']:
             cmd_args.append('chat')
 
