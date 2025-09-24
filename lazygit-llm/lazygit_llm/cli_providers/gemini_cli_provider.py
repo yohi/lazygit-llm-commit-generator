@@ -276,20 +276,52 @@ class GeminiCLIProvider(BaseProvider):
 
         # 出力トークン数の設定
         output_tokens = max_output_tokens or self.max_output_tokens
-
-        # コマンド引数の構築（安全な方法）
-        cmd_args = [
-            self.gcloud_path,
-            'ai',
-            'generative-models',
-            'generate-text',
-            f'--model={self.model}',
-            f'--prompt={sanitized_prompt}',
-            f'--max-output-tokens={output_tokens}',
-            f'--temperature={self.temperature}',
-            '--format=value(predictions[0].content)',
-            '--quiet'
-        ]
+        
+        # ARG_MAX制限対策: 大きなプロンプトの場合は一時ファイル経由
+        prompt_size = len(sanitized_prompt.encode('utf-8'))
+        use_temp_file = prompt_size > 50000  # 50KB以上
+        temp_file_path = None
+        
+        if use_temp_file:
+            logger.debug(f"大きなプロンプト({prompt_size}bytes)を一時ファイル経由で処理")
+            import tempfile
+            import os
+            try:
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as temp_file:
+                    temp_file.write(sanitized_prompt)
+                    temp_file_path = temp_file.name
+                
+                # コマンド引数の構築（ファイル経由）
+                cmd_args = [
+                    self.gcloud_path,
+                    'ai',
+                    'generative-models',
+                    'generate-text',
+                    f'--model={self.model}',
+                    f'--prompt-file={temp_file_path}',
+                    f'--max-output-tokens={output_tokens}',
+                    f'--temperature={self.temperature}',
+                    '--format=value(candidates[0].content.parts[0])',
+                    '--quiet'
+                ]
+            except Exception as e:
+                logger.warning(f"一時ファイル作成失敗、通常プロンプトにフォールバック: {e}")
+                use_temp_file = False
+        
+        if not use_temp_file:
+            # コマンド引数の構築（通常方法、レスポンス形式修正済み）
+            cmd_args = [
+                self.gcloud_path,
+                'ai',
+                'generative-models',
+                'generate-text',
+                f'--model={self.model}',
+                f'--prompt={sanitized_prompt}',
+                f'--max-output-tokens={output_tokens}',
+                f'--temperature={self.temperature}',
+                '--format=value(candidates[0].content.parts[0])',
+                '--quiet'
+            ]
 
         # プロジェクトIDが設定されている場合は追加
         if self.project_id:
@@ -350,6 +382,15 @@ class GeminiCLIProvider(BaseProvider):
                 raise
             logger.error(f"gcloudコマンド実行中に予期しないエラー: {e}")
             raise ProviderError(f"gcloudコマンド実行に失敗しました: {e}")
+        
+        finally:
+            # 一時ファイルのクリーンアップ
+            if temp_file_path and os.path.exists(temp_file_path):
+                try:
+                    os.unlink(temp_file_path)
+                    logger.debug(f"一時ファイルを削除: {temp_file_path}")
+                except Exception as e:
+                    logger.warning(f"一時ファイル削除失敗: {temp_file_path}, {e}")
 
     def _sanitize_input(self, input_text: str) -> str:
         """

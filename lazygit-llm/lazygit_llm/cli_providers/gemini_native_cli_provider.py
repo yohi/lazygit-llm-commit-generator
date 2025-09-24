@@ -170,23 +170,45 @@ class GeminiNativeCLIProvider(BaseProvider):
         if timeout is None:
             timeout = self.cli_timeout
 
-        # コマンド構築（stdinでプロンプトを渡す）
-        cmd = [self.gemini_path, '-p', '-']  # '-'でstdinを意味する
+        # ARG_MAX制限対策: 大きなプロンプトは常にstdin経由
+        prompt_size = len(prompt.encode('utf-8'))
+        use_stdin = prompt_size > 8192  # 8KB以上は確実にstdin経由
+        
+        if use_stdin:
+            logger.debug(f"大きなプロンプト({prompt_size}bytes)をstdin経由で処理")
+            # コマンド構築（stdinでプロンプトを渡す）
+            cmd = [self.gemini_path, '-p', '-']  # '-'でstdinを意味する
+        else:
+            # 小さなプロンプトはコマンド引数経由（互換性のため）
+            cmd = [self.gemini_path, '-p', prompt]
 
         try:
             logger.debug("Geminiコマンド実行: %s", ' '.join(cmd))
 
-            # セキュアなsubprocess実行（stdin経由でプロンプト送信）
-            result = subprocess.run(
-                cmd,
-                input=prompt,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                shell=False,  # セキュリティのためshell=False
-                cwd=None,     # 作業ディレクトリを制限
-                env=dict(os.environ)  # 環境変数を複製
-            )
+            # セキュアなsubprocess実行
+            if use_stdin:
+                # stdin経由でプロンプト送信（大きなプロンプト用）
+                result = subprocess.run(
+                    cmd,
+                    input=prompt,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                    shell=False,  # セキュリティのためshell=False
+                    cwd=None,     # 作業ディレクトリを制限
+                    env=self._create_safe_environment()
+                )
+            else:
+                # コマンド引数経由（小さなプロンプト用）
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                    shell=False,  # セキュリティのためshell=False
+                    cwd=None,     # 作業ディレクトリを制限
+                    env=self._create_safe_environment()
+                )
 
             # 出力サイズの制限チェック
             if len(result.stdout) > self.MAX_STDOUT_SIZE:
