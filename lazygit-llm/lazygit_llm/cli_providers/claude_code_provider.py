@@ -281,7 +281,7 @@ class ClaudeCodeProvider(BaseProvider):
 
             # 安全なディレクトリの確認 (whitelist approach) - HOME配下は除外
             safe_directories = [
-                '/usr/local/bin/', '/usr/bin/', '/opt/', '/usr/sbin/',
+                '/usr/local/bin/', '/usr/local/Cellar/', '/usr/bin/', '/opt/', '/usr/sbin/',
                 '/bin/', '/sbin/', '/opt/homebrew/bin/',
             ]
             # Windows の標準ディレクトリも許可
@@ -388,7 +388,7 @@ class ClaudeCodeProvider(BaseProvider):
         if flags['print_flag']:
             cmd_args.append(flags['print_flag'])
 
-        # 出力形式（利用可能な場合）
+        # 出力形式 (利用可能な場合)
         if flags['output_format']:
             cmd_args.extend(['--output-format', flags['output_format']])
 
@@ -437,7 +437,7 @@ class ClaudeCodeProvider(BaseProvider):
         try:
             logger.debug(f"claude-codeコマンド実行: {' '.join(cmd_args[:3])}... (プロンプトはstdin経由)")
 
-            # subprocess実行（セキュリティ要件に準拠）
+            # subprocess実行 (セキュリティ要件に準拠)
             result = subprocess.run(
                 cmd_args,
                 input=sanitized_prompt,  # プロンプトをstdinに渡す
@@ -474,7 +474,7 @@ class ClaudeCodeProvider(BaseProvider):
             if not response:
                 raise ResponseError("claude-codeから空のレスポンスを受信しました")
 
-            # 安全メタデータのみログ出力（内容は記録しない）
+            # 安全メタデータのみログ出力 (内容は記録しない)
             logger.info(f"claude-codeコマンド成功: exit_code={result.returncode}, response_length={len(response)}")
 
             return response
@@ -510,7 +510,7 @@ class ClaudeCodeProvider(BaseProvider):
         for char in dangerous_chars:
             sanitized = sanitized.replace(char, '')
 
-        # 長さ制限（Claudeは長いコンテキストを扱えるため、より大きな制限）
+        # 長さ制限 (Claudeは長いコンテキストを扱えるため、より大きな制限)
         max_prompt_length = 100000  # 100KB制限
         if len(sanitized) > max_prompt_length:
             sanitized = sanitized[:max_prompt_length]
@@ -560,8 +560,8 @@ class ClaudeCodeProvider(BaseProvider):
 
         Args:
             output: 出力テキスト
-            max_size: 最大サイズ（バイト）
-            output_type: 出力タイプ（ログ用）
+            max_size: 最大サイズ (バイト)
+            output_type: 出力タイプ (ログ用)
 
         Returns:
             切り詰められた出力

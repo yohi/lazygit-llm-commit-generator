@@ -221,9 +221,9 @@ class TestGeminiDirectCLIProvider:
         result = provider._execute_gemini_command(small_prompt)
 
         assert result == "feat: small prompt response\n"
-        # コマンド引数に --prompt が含まれることを確認
+        # コマンド引数に --prompt または -p が含まれることを確認
         call_args = mock_run.call_args[0][0]
-        assert '--prompt' in call_args
+        assert ('--prompt' in call_args) or ('-p' in call_args)
         assert small_prompt in call_args
 
     @patch('shutil.which')

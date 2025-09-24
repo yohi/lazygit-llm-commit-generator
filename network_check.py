@@ -77,8 +77,18 @@ def ping_test(host: str = "google.com") -> Tuple[bool, str]:
         (成功/失敗, メッセージ)
     """
     try:
-        # ホスト名の基本検証
+        # ホスト名の基本検証と正規化
+        host = host.strip()
         if not host or len(host) > 255:
+            return False, f"無効なホスト名: {host}"
+
+        # セキュリティ: pingオプションインジェクション防止
+        if host.startswith("-"):
+            return False, f"無効なホスト名: {host}"
+
+        # 許可文字チェック (英数字、ドット、ハイフン、コロン)
+        import re
+        if not re.fullmatch(r"[A-Za-z0-9.-:]+", host):
             return False, f"無効なホスト名: {host}"
 
         # Windows/Linux対応
