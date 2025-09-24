@@ -399,7 +399,7 @@ class GeminiAPIProvider(BaseProvider):
             モデル情報の辞書
         """
         return {
-            'provider': 'gemini-api',
+            'provider': 'gemini',
             'model': self.model_name,
             'supports_streaming': True,
             'max_output_tokens': self.max_tokens,

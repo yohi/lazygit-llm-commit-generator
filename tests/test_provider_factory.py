@@ -29,7 +29,7 @@ class TestProviderFactory:
         assert isinstance(self.factory._providers, dict)
 
         # デフォルトプロバイダーが登録されていることを確認
-        expected_providers = ['openai', 'anthropic', 'gemini-api', 'gemini-cli', 'claude-code']
+        expected_providers = ['openai', 'anthropic', 'gemini', 'gcloud', 'gemini-cli', 'claude-code']
         for provider_name in expected_providers:
             assert provider_name in self.factory._providers
 
@@ -98,7 +98,7 @@ class TestProviderFactory:
     def test_create_provider_gemini_api_success(self):
         """Gemini APIプロバイダー作成成功テスト"""
         config = ProviderConfig(
-            name='gemini-api',
+            name='gemini',
             type='api',
             model='gemini-1.5-pro',
             api_key='test-key',
@@ -120,7 +120,7 @@ class TestProviderFactory:
     def test_create_provider_gemini_cli_success(self):
         """Gemini CLIプロバイダー作成成功テスト"""
         config = ProviderConfig(
-            name='gemini-cli',
+            name='gcloud',
             type='cli',
             model='gemini-1.5-pro',
             api_key=None,
@@ -200,7 +200,7 @@ class TestProviderFactory:
         """サポートされているプロバイダー一覧取得テスト"""
         supported_providers = self.factory.get_supported_providers()
 
-        expected_providers = ['openai', 'anthropic', 'gemini-api', 'gemini-cli', 'claude-code']
+        expected_providers = ['openai', 'anthropic', 'gemini', 'gcloud', 'gemini-cli', 'claude-code']
         assert isinstance(supported_providers, list)
         for provider in expected_providers:
             assert provider in supported_providers
@@ -209,7 +209,8 @@ class TestProviderFactory:
         """プロバイダーサポート確認テスト（サポート済み）"""
         assert self.factory.is_provider_supported('openai') is True
         assert self.factory.is_provider_supported('anthropic') is True
-        assert self.factory.is_provider_supported('gemini-api') is True
+        assert self.factory.is_provider_supported('gemini') is True
+        assert self.factory.is_provider_supported('gcloud') is True
         assert self.factory.is_provider_supported('gemini-cli') is True
         assert self.factory.is_provider_supported('claude-code') is True
 
@@ -341,7 +342,7 @@ class TestProviderFactory:
     def test_build_provider_config_dict_no_api_key(self):
         """APIキーなしのプロバイダー設定辞書構築テスト"""
         config = ProviderConfig(
-            name='gemini-cli',
+            name='gcloud',
             type='cli',
             model='gemini-1.5-pro',
             api_key=None,
@@ -359,8 +360,8 @@ class TestProviderFactory:
     @pytest.mark.parametrize("provider_name,provider_class", [
         ('openai', 'lazygit_llm.src.api_providers.openai_provider.OpenAIProvider'),
         ('anthropic', 'lazygit_llm.src.api_providers.anthropic_provider.AnthropicProvider'),
-        ('gemini-api', 'lazygit_llm.src.api_providers.gemini_api_provider.GeminiApiProvider'),
-        ('gemini-cli', 'lazygit_llm.src.cli_providers.gemini_cli_provider.GeminiCliProvider'),
+        ('gemini', 'lazygit_llm.src.api_providers.gemini_api_provider.GeminiApiProvider'),
+        ('gcloud', 'lazygit_llm.src.cli_providers.gemini_cli_provider.GeminiCliProvider'),
         ('claude-code', 'lazygit_llm.src.cli_providers.claude_code_provider.ClaudeCodeProvider'),
     ])
     def test_provider_class_mapping(self, provider_name, provider_class):

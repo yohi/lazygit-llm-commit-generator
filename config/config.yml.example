@@ -3,11 +3,11 @@
 # ===========================================
 
 # 使用するLLMプロバイダー
-# 選択肢: openai, anthropic, gemini-api, gemini-cli, claude-code
+# 選択肢: openai, anthropic, gemini, gcloud, gemini-cli, claude-code
 provider: "openai"
 
 # APIキー（環境変数使用を推奨）
-# API型プロバイダー（openai, anthropic, gemini-api）でのみ必要
+# API型プロバイダー（openai, anthropic, gemini）でのみ必要
 api_key: "${OPENAI_API_KEY}"
 
 # 使用するモデル名
@@ -49,14 +49,19 @@ additional_params:
 # model_name: "claude-3-5-sonnet-20241022"
 
 # Google Gemini API設定例
-# provider: "gemini-api"
+# provider: "gemini"
 # api_key: "${GOOGLE_API_KEY}"
 # model_name: "gemini-1.5-pro"
 
-# Google Gemini CLI設定例
-# provider: "gemini-cli"
+# Google Gemini CLI設定例（gcloud）
+# provider: "gcloud"
 # model_name: "gemini-1.5-pro"
 # （gcloud CLI認証が必要）
+
+# Gemini CLI設定例（直接geminiコマンド）
+# provider: "gemini-cli"
+# model_name: "gemini-1.5-pro"
+# （gemini CLIが認証済み、APIキー不要）
 
 # Claude Code CLI設定例
 # provider: "claude-code"

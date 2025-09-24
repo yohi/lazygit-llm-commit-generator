@@ -31,10 +31,24 @@ from lazygit_llm.base_provider import ProviderError, AuthenticationError, Provid
 
 def setup_logging(verbose: bool = False) -> None:
     """
-    ロギング設定を初期化
+    アプリケーションのロギング設定を初期化します。
+    
+    セキュリティを考慮した一時ログファイルの作成と、適切なログフォーマット、
+    ハンドラーの設定を行います。詳細モードが有効な場合は、コンソール出力も追加します。
 
     Args:
-        verbose: 詳細ログを有効にする場合True
+        verbose (bool, optional): 
+            詳細ログモード。Trueの場合、DEBUGレベルのログとコンソール出力を有効化。
+            デフォルトは False。
+
+    Note:
+        - ログファイルは一時ディレクトリに 'lazygit-llm-*.log' 形式で作成
+        - ログフォーマット: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        - ファイルエンコーディング: UTF-8
+        
+    Security:
+        - 一時ファイルは適切なファイルディスクリプタ管理で作成
+        - ログファイルパスは標準エラー出力に表示（詳細モード時のみ）
     """
     level = logging.DEBUG if verbose else logging.INFO
     # セキュリティを考慮して一意な名前のログファイルを作成
@@ -57,10 +71,27 @@ def setup_logging(verbose: bool = False) -> None:
 
 def parse_arguments() -> argparse.Namespace:
     """
-    コマンドライン引数を解析
+    コマンドライン引数を解析し、アプリケーション設定を取得します。
+    
+    サポートされる引数：
+    - --config/-c: 設定ファイルパスの指定
+    - --verbose/-v: 詳細ログの有効化
+    - --test-config: 設定テストモード（設定のみテストして終了）
+    - --version: バージョン情報表示
 
     Returns:
-        解析された引数
+        argparse.Namespace: 解析されたコマンドライン引数のNamespaceオブジェクト。
+            以下の属性を含む：
+            - config (str): 設定ファイルパス
+            - verbose (bool): 詳細ログフラグ
+            - test_config (bool): 設定テストフラグ
+
+    Example:
+        >>> args = parse_arguments()
+        >>> print(args.config)
+        'config/config.yml'
+        >>> print(args.verbose)
+        False
     """
     parser = argparse.ArgumentParser(
         description='LazyGit LLM Commit Message Generator',

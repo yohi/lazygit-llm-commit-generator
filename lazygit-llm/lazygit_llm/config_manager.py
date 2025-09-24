@@ -20,7 +20,30 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ProviderConfig:
-    """プロバイダー設定データクラス"""
+    """
+    プロバイダー設定を表すデータクラス。
+    
+    LLMプロバイダーの動作に必要な全ての設定パラメータを保持します。
+    APIキーの安全な管理と、プロバイダー固有のパラメータをサポートします。
+    
+    Attributes:
+        name (str): プロバイダー名（例: "openai", "anthropic", "gemini-api"）
+        type (str): プロバイダータイプ（"api" または "cli"）
+        model (str): 使用するモデル名（例: "gpt-4", "claude-3-sonnet"）
+        api_key (Optional[str]): APIキー（CLI型プロバイダーではNone）
+        timeout (int): リクエストタイムアウト時間（秒）。デフォルト: 30
+        max_tokens (int): 最大生成トークン数。デフォルト: 100
+        additional_params (Dict[str, Any]): プロバイダー固有の追加パラメータ
+        
+    Example:
+        >>> config = ProviderConfig(
+        ...     name="openai",
+        ...     type="api",
+        ...     model="gpt-4",
+        ...     api_key="sk-...",
+        ...     additional_params={"temperature": 0.3}
+        ... )
+    """
     name: str
     type: str  # "api" or "cli"
     model: str
@@ -37,10 +60,28 @@ class ConfigError(Exception):
 
 class ConfigManager:
     """
-    設定管理クラス
-
-    YAML設定ファイルの読み込み、環境変数解決、設定検証を行う。
-    セキュリティ要件に従いAPIキーの安全な取り扱いを実装。
+    アプリケーション設定の管理を行うメインクラス。
+    
+    YAML設定ファイルの安全な読み込み、環境変数の展開、設定値の検証、
+    およびプロバイダー固有設定の管理を統合的に行います。
+    セキュリティ要件に準拠したAPIキー管理と入力検証を実装。
+    
+    Features:
+        - YAML設定ファイルの読み込みと解析
+        - ${VAR_NAME} 形式の環境変数展開
+        - プロバイダー設定の検証
+        - セキュリティを考慮した入力サニタイゼーション
+        - 複数のプロバイダータイプ（API/CLI）のサポート
+    
+    Supported Providers:
+        API型: openai, anthropic, gemini
+        CLI型: gcloud, gemini-cli, claude-code, gemini-native
+    
+    Example:
+        >>> manager = ConfigManager()
+        >>> config = manager.load_config("config.yml")
+        >>> if manager.validate_config(config):
+        ...     print("設定は有効です")
     """
 
     def __init__(self):
@@ -53,7 +94,8 @@ class ConfigManager:
         self.supported_providers = {
             'openai': {'type': 'api', 'required_fields': ['api_key', 'model_name']},
             'anthropic': {'type': 'api', 'required_fields': ['api_key', 'model_name']},
-            'gemini-api': {'type': 'api', 'required_fields': ['api_key', 'model_name']},
+            'gemini': {'type': 'api', 'required_fields': ['api_key', 'model_name']},
+            'gcloud': {'type': 'cli', 'required_fields': ['model_name']},
             'gemini-cli': {'type': 'cli', 'required_fields': ['model_name']},
             'claude-code': {'type': 'cli', 'required_fields': ['model_name']},
             'gemini-native': {'type': 'cli', 'required_fields': []},

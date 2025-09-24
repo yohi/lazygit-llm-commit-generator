@@ -189,7 +189,7 @@ additional_params:
         providers_to_test = [
             ('openai', 'src.api_providers.openai_provider.OpenAIProvider'),
             ('anthropic', 'src.api_providers.anthropic_provider.AnthropicProvider'),
-            ('gemini-api', 'src.api_providers.gemini_api_provider.GeminiAPIProvider'),
+            ('gemini', 'src.api_providers.gemini_api_provider.GeminiAPIProvider'),
         ]
 
         for provider_name, provider_class_path in providers_to_test:

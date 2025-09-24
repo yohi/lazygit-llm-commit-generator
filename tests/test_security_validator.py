@@ -378,7 +378,7 @@ class TestClass:
         ("anthropic", "invalid", False),
         ("google", "AIza" + "a" * 35, True),
         ("google", "invalid", False),
-        ("gemini-api", "AIza" + "a" * 35, True),  # Google alias
+        ("gemini", "AIza" + "a" * 35, True),  # Google alias
         ("unknown", "any-key", False),
     ])
     def test_api_key_validation_matrix(self, provider, key, expected_valid):

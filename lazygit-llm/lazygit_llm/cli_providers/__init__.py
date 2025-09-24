@@ -54,7 +54,7 @@ def _auto_register_providers():
     """利用可能なCLIプロバイダーを自動登録"""
     try:
         from .gemini_cli_provider import GeminiCLIProvider
-        register_provider('gemini-cli', GeminiCLIProvider)
+        register_provider('gcloud', GeminiCLIProvider)
         logger.debug("Gemini CLI プロバイダーを登録しました")
     except ImportError as e:
         logger.debug("Gemini CLI プロバイダーの登録をスキップ: %s", e)
@@ -72,6 +72,13 @@ def _auto_register_providers():
         logger.debug("Gemini Native CLI プロバイダーを登録しました")
     except ImportError as e:
         logger.debug("Gemini Native CLI プロバイダーの登録をスキップ: %s", e)
+
+    try:
+        from .gemini_direct_cli_provider import GeminiDirectCLIProvider
+        register_provider('gemini-cli', GeminiDirectCLIProvider)
+        logger.debug("Gemini Direct CLI プロバイダーを登録しました")
+    except ImportError as e:
+        logger.debug("Gemini Direct CLI プロバイダーの登録をスキップ: %s", e)
 
 
 # プロバイダーを自動登録

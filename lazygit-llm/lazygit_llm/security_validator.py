@@ -68,13 +68,15 @@ class SecurityValidator:
         r'[\x00-\x08\x0B\x0C\x0E-\x1F]',           # 制御文字(改行/タブ除外)
     ]
 
-    # 機密情報パターン
+    # 機密情報パターン（全て大文字小文字区別なし）
     SENSITIVE_PATTERNS: ClassVar[List[str]] = [
         r'(?i)(password|passwd|pwd)\s*[:=]\s*[\'"]?([^\s\'"]{8,})',
         r'(?i)(secret|token|key)\s*[:=]\s*[\'"]?([^\s\'"]{16,})',
         r'(?i)(api[_-]?key)\s*[:=]\s*[\'"]?([^\s\'"]{20,})',
-        r'[A-Za-z0-9+/]{64,}={0,2}',  # Base64エンコード
-        r'[0-9a-fA-F]{32,}',          # Hexエンコード
+        r'(?i)[A-Z0-9+/]{64,}={0,2}',  # Base64エンコード（大文字小文字区別なし）
+        r'(?i)[0-9A-F]{32,}',          # Hexエンコード（大文字小文字区別なし）
+        r'(?i)(bearer|authorization)\s*[:=]\s*[\'"]?([^\s\'"]{20,})',  # 認証トークン
+        r'(?i)(private[_-]?key|secret[_-]?key)\s*[:=]\s*[\'"]?([^\s\'"]{40,})',  # 秘密鍵
     ]
 
     def __init__(self, enable_caching: bool = True):

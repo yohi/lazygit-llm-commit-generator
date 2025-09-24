@@ -259,11 +259,39 @@ class ClaudeCodeProvider(BaseProvider):
             if os.path.basename(resolved_path) not in self.ALLOWED_BINARIES:
                 raise ProviderError(f"許可されていないバイナリ名です: {resolved_path}")
 
-            # 危険なパスのチェック
-            dangerous_patterns = ['/tmp/', '/var/tmp/']
+            # 危険なパスのチェック（強化版）
+            dangerous_patterns = [
+                '/tmp/', '/var/tmp/', '/dev/shm/', '/proc/', '/sys/',
+                '../', '..\\', './', '.\\',  # パストラバーサル
+                '$HOME/.cache/', '/run/user/', '/private/tmp/'  # 一時ディレクトリ
+            ]
             for pattern in dangerous_patterns:
                 if pattern in resolved_path:
                     raise ProviderError(f"危険なパスが検出されました: {resolved_path}")
+
+            # 安全なディレクトリの確認（whitelist approach）
+            safe_directories = [
+                '/usr/bin/', '/usr/local/bin/', '/opt/', '/usr/sbin/',
+                '/bin/', '/sbin/', '/home/', '/Users/'
+            ]
+            is_safe_directory = any(resolved_path.startswith(safe_dir) 
+                                  for safe_dir in safe_directories)
+            
+            if not is_safe_directory:
+                raise ProviderError(f"安全でないディレクトリが検出されました: {resolved_path}")
+
+            # ファイル所有者とパーミッションの検証
+            try:
+                stat_info = resolved.stat()
+                # 他のユーザーが書き込み可能でないことを確認
+                if stat_info.st_mode & 0o002:  # world-writable
+                    raise ProviderError(f"バイナリが誰でも書き込み可能です: {resolved_path}")
+                # グループが書き込み可能でrootまたは現在のユーザー所有でない場合
+                if (stat_info.st_mode & 0o020 and 
+                    stat_info.st_uid != 0 and stat_info.st_uid != os.getuid()):
+                    raise ProviderError(f"バイナリの権限が安全ではありません: {resolved_path}")
+            except OSError as e:
+                logger.warning(f"ファイル権限の検証をスキップ: {e}")
 
             logger.debug(f"バイナリセキュリティ検証完了: {resolved_path}")
 

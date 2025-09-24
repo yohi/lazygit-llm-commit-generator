@@ -446,7 +446,7 @@ class TestMain:
     @pytest.mark.parametrize("provider,model,env_var", [
         ('openai', 'gpt-4', 'OPENAI_API_KEY'),
         ('anthropic', 'claude-3-5-sonnet-20241022', 'ANTHROPIC_API_KEY'),
-        ('gemini-api', 'gemini-1.5-pro', 'GOOGLE_API_KEY'),
+        ('gemini', 'gemini-1.5-pro', 'GOOGLE_API_KEY'),
     ])
     def test_main_different_providers(self, provider, model, env_var, sample_git_diff):
         """異なるプロバイダーでのメイン機能テスト"""

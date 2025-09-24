@@ -44,7 +44,7 @@ index 0000000..1234567
         """プロバイダー設定を作成"""
         base_config = {
             'name': provider_name,
-            'type': 'api' if provider_name in ['openai', 'anthropic', 'gemini-api'] else 'cli',
+            'type': 'api' if provider_name in ['openai', 'anthropic', 'gemini'] else 'cli',
             'model': self.get_default_model(provider_name),
             'api_key': kwargs.get('api_key', 'test-key-' + provider_name),
             'timeout': kwargs.get('timeout', 30),
@@ -64,8 +64,8 @@ index 0000000..1234567
         model_mapping = {
             'openai': 'gpt-4',
             'anthropic': 'claude-3-5-sonnet-20241022',
-            'gemini-api': 'gemini-1.5-pro',
-            'gemini-cli': 'gemini-1.5-pro',
+            'gemini': 'gemini-1.5-pro',
+            'gcloud': 'gemini-1.5-pro',
             'claude-code': 'claude-3-5-sonnet-20241022'
         }
         return model_mapping.get(provider_name, 'default-model')
@@ -118,7 +118,7 @@ index 0000000..1234567
 
     def test_gemini_api_provider_compatibility(self):
         """Gemini APIプロバイダー互換性テスト"""
-        config = self.create_provider_config('gemini-api')
+        config = self.create_provider_config('gemini')
 
         with patch('lazygit_llm.src.api_providers.gemini_api_provider.GeminiApiProvider') as mock_provider_class:
             mock_provider = Mock()
@@ -141,7 +141,7 @@ index 0000000..1234567
 
     def test_gemini_cli_provider_compatibility(self):
         """Gemini CLIプロバイダー互換性テスト"""
-        config = self.create_provider_config('gemini-cli')
+        config = self.create_provider_config('gcloud')
 
         with patch('lazygit_llm.src.cli_providers.gemini_cli_provider.GeminiCliProvider') as mock_provider_class:
             mock_provider = Mock()
@@ -195,7 +195,7 @@ index 0000000..1234567
             'stop_sequences': ['END', '\n\n']
         }
 
-        providers_to_test = ['openai', 'anthropic', 'gemini-api']
+        providers_to_test = ['openai', 'anthropic', 'gemini']
 
         for provider_name in providers_to_test:
             config = self.create_provider_config(
@@ -212,7 +212,7 @@ index 0000000..1234567
         providers_configs = [
             ('openai', 'lazygit_llm.src.api_providers.openai_provider.OpenAIProvider'),
             ('anthropic', 'lazygit_llm.src.api_providers.anthropic_provider.AnthropicProvider'),
-            ('gemini-api', 'lazygit_llm.src.api_providers.gemini_api_provider.GeminiApiProvider'),
+            ('gemini', 'lazygit_llm.src.api_providers.gemini_api_provider.GeminiApiProvider'),
         ]
 
         error_scenarios = [
@@ -245,23 +245,23 @@ index 0000000..1234567
             "refactor: improve timestamp handling",
         ]
 
-        all_providers = ['openai', 'anthropic', 'gemini-api', 'gemini-cli', 'claude-code']
+        all_providers = ['openai', 'anthropic', 'gemini', 'gcloud', 'claude-code']
 
         for provider_name in all_providers:
             config = self.create_provider_config(provider_name)
 
             # プロバイダーのパッケージパスを決定
-            if provider_name in ['openai', 'anthropic', 'gemini-api']:
+            if provider_name in ['openai', 'anthropic', 'gemini']:
                 package_path = f'lazygit_llm.src.api_providers.{provider_name}_provider'
                 class_map = {
                     'openai': 'OpenAIProvider',
                     'anthropic': 'AnthropicProvider',
-                    'gemini-api': 'GeminiApiProvider',
+                    'gemini': 'GeminiApiProvider',
                 }
                 class_name = class_map[provider_name]
             else:
                 package_path = f'lazygit_llm.src.cli_providers.{provider_name.replace("-", "_")}_provider'
-                if provider_name == 'gemini-cli':
+                if provider_name == 'gcloud':
                     class_name = 'GeminiCliProvider'
                 else:
                     class_name = 'ClaudeCodeProvider'
@@ -285,8 +285,8 @@ index 0000000..1234567
         model_compatibility = {
             'openai': ['gpt-4', 'gpt-3.5-turbo', 'gpt-4-turbo'],
             'anthropic': ['claude-3-5-sonnet-20241022', 'claude-3-haiku-20240307', 'claude-3-opus-20240229'],
-            'gemini-api': ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.0-pro'],
-            'gemini-cli': ['gemini-1.5-pro', 'gemini-1.5-flash'],
+            'gemini': ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.0-pro'],
+            'gcloud': ['gemini-1.5-pro', 'gemini-1.5-flash'],
             'claude-code': ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022']
         }
 
@@ -342,7 +342,7 @@ index 0000000..1234567
 
     def test_provider_switching_compatibility(self):
         """プロバイダー切り替え互換性テスト"""
-        providers = ['openai', 'anthropic', 'gemini-api']
+        providers = ['openai', 'anthropic', 'gemini']
 
         for provider_name in providers:
             config = self.create_provider_config(provider_name)
@@ -352,7 +352,7 @@ index 0000000..1234567
             class_map = {
                 'openai': 'OpenAIProvider',
                 'anthropic': 'AnthropicProvider',
-                'gemini-api': 'GeminiApiProvider',
+                'gemini': 'GeminiApiProvider',
             }
             class_name = class_map[provider_name]
 
@@ -373,7 +373,7 @@ index 0000000..1234567
         import threading
         import time
 
-        providers = ['openai', 'anthropic', 'gemini-api']
+        providers = ['openai', 'anthropic', 'gemini']
         results = {}
 
         def test_provider_thread(provider_name, results_dict):
@@ -384,7 +384,7 @@ index 0000000..1234567
             class_map = {
                 'openai': 'OpenAIProvider',
                 'anthropic': 'AnthropicProvider',
-                'gemini-api': 'GeminiApiProvider',
+                'gemini': 'GeminiApiProvider',
             }
             class_name = class_map.get(provider_name, f'{provider_name.title()}Provider')
 
@@ -432,14 +432,14 @@ index 0000000..1234567
                 'max_tokens': True,
                 'stop_sequences': False
             },
-            'gemini-api': {
+            'gemini': {
                 'streaming': False,
                 'temperature': True,
                 'top_p': True,
                 'max_tokens': True,
                 'stop_sequences': True
             },
-            'gemini-cli': {
+            'gcloud': {
                 'streaming': False,
                 'temperature': True,
                 'top_p': True,
@@ -473,7 +473,7 @@ index 0000000..1234567
     def test_provider_fallback_mechanism(self):
         """プロバイダーフォールバック機構テスト"""
         primary_provider = 'openai'
-        fallback_providers = ['anthropic', 'gemini-api']
+        fallback_providers = ['anthropic', 'gemini']
 
         # プライマリプロバイダーが失敗した場合のシミュレート
         primary_config = self.create_provider_config(primary_provider)
@@ -493,7 +493,7 @@ index 0000000..1234567
             class_map = {
                 'openai': 'OpenAIProvider',
                 'anthropic': 'AnthropicProvider',
-                'gemini-api': 'GeminiApiProvider',
+                'gemini': 'GeminiApiProvider',
             }
             class_name = class_map.get(fallback_provider, f'{fallback_provider.title()}Provider')
 

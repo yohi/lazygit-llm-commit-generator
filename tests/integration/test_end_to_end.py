@@ -197,7 +197,7 @@ index 0000000..1234567
         providers_to_test = [
             ('openai', 'lazygit_llm.src.api_providers.openai_provider.OpenAIProvider'),
             ('anthropic', 'lazygit_llm.src.api_providers.anthropic_provider.AnthropicProvider'),
-            ('gemini-api', 'lazygit_llm.src.api_providers.gemini_api_provider.GeminiApiProvider'),
+            ('gemini', 'lazygit_llm.src.api_providers.gemini_api_provider.GeminiApiProvider'),
         ]
 
         for provider_name, provider_class_path in providers_to_test:

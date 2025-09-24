@@ -41,7 +41,7 @@ model_name: "gpt-4"
 # ===========================================
 
 # プロバイダー設定
-provider: "openai"  # openai, anthropic, gemini-api, gemini-cli, claude-code
+provider: "openai"  # openai, anthropic, gemini, gcloud, gemini-cli, claude-code
 
 # APIキー（環境変数推奨）
 api_key: "${OPENAI_API_KEY}"
@@ -109,7 +109,7 @@ additional_params:
 ### Google Gemini API
 
 ```yaml
-provider: "gemini-api"
+provider: "gemini"
 api_key: "${GOOGLE_API_KEY}"
 model_name: "gemini-1.5-pro"  # gemini-1.5-pro, gemini-1.5-flash
 timeout: 30
@@ -133,7 +133,7 @@ additional_params:
 ### Google Gemini CLI
 
 ```yaml
-provider: "gemini-cli"
+provider: "gcloud"
 model_name: "gemini-1.5-pro"
 timeout: 45
 max_tokens: 100
@@ -458,7 +458,7 @@ prompt_template: |
 ### 高度な設定（上級者向け）
 
 ```yaml
-provider: "gemini-api"
+provider: "gemini"
 api_key: "${GOOGLE_API_KEY}"
 model_name: "gemini-1.5-pro"
 timeout: 60
