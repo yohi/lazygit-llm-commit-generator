@@ -93,6 +93,10 @@ class ClaudeCodeProvider(BaseProvider):
         if not diff or not diff.strip():
             raise ProviderError("空の差分が提供されました")
 
+        # プロンプトテンプレートの検証
+        if not isinstance(prompt_template, str) or not prompt_template.strip():
+            raise ProviderError("無効なプロンプトテンプレートが提供されました")
+
         prompt = prompt_template.replace('$diff', diff)
         logger.debug(f"Claude Code CLIにリクエスト送信: model={self.model}, prompt_length={len(prompt)}")
 
@@ -268,6 +272,87 @@ class ClaudeCodeProvider(BaseProvider):
                 raise
             raise ProviderError(f"バイナリセキュリティ検証エラー: {e}")
 
+    def _detect_binary_and_build_args(self) -> list[str]:
+        """
+        Claude Code CLIバイナリを検出し、適切なコマンド引数を構築
+
+        Returns:
+            適切なCLIフラグを含むコマンド引数リスト
+
+        Raises:
+            ProviderError: バイナリ検出またはフラグ検証エラー
+        """
+        # バイナリパスから実際のコマンド名を取得
+        binary_name = os.path.basename(self.claude_code_path)
+        
+        # 基本のコマンド引数
+        base_args = [self.claude_code_path]
+        
+        try:
+            # --helpでサポートされているフラグを確認
+            help_result = subprocess.run(
+                [self.claude_code_path, '--help'],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                shell=False
+            )
+            
+            help_output = help_result.stdout + help_result.stderr
+            logger.debug(f"Claude Code CLI ヘルプ出力を確認: {binary_name}")
+            
+        except subprocess.TimeoutExpired:
+            logger.warning("Claude Code CLI --help がタイムアウト、デフォルトフラグを使用")
+            help_output = ""
+        except Exception as e:
+            logger.warning(f"Claude Code CLI --help 実行エラー: {e}, デフォルトフラグを使用")
+            help_output = ""
+        
+        # フラグの可用性を確認
+        flags = {
+            'print_flag': None,      # 非対話モード: -p, --print
+            'output_format': None,   # 出力形式: --output-format
+            'model_flag': None       # モデル指定: --model
+        }
+        
+        help_lower = help_output.lower()
+        
+        # 非対話モードフラグの検出
+        if '-p, --print' in help_lower or '--print' in help_lower:
+            flags['print_flag'] = '--print'
+        elif '-p' in help_lower:
+            flags['print_flag'] = '-p'
+        
+        # 出力形式フラグの検出
+        if '--output-format' in help_lower:
+            flags['output_format'] = 'text'  # text/json/stream-json
+        
+        # モデルフラグの検出
+        if '--model' in help_lower:
+            flags['model_flag'] = True
+        
+        # コマンド引数の構築
+        cmd_args = base_args.copy()
+        
+        # chatコマンドが利用可能かチェック（claude-codeの場合）
+        if 'chat' in help_lower or binary_name in ['claude-code']:
+            cmd_args.append('chat')
+        
+        # モデル指定
+        if flags['model_flag']:
+            cmd_args.extend(['--model', self.model])
+        
+        # 非対話モード
+        if flags['print_flag']:
+            cmd_args.append(flags['print_flag'])
+        
+        # 出力形式（利用可能な場合）
+        if flags['output_format']:
+            cmd_args.extend(['--output-format', flags['output_format']])
+        
+        logger.debug(f"構築されたコマンド引数: {' '.join(cmd_args[:4])}... (プロンプトはstdin経由)")
+        return cmd_args
+
     def _execute_claude_code_command(self, prompt: str, test_mode: bool = False) -> str:
         """
         claude-codeコマンドを安全に実行
@@ -287,18 +372,22 @@ class ClaudeCodeProvider(BaseProvider):
         # 入力の検証とサニタイゼーション
         sanitized_prompt = self._sanitize_input(prompt)
 
-        # コマンド引数の構築（安全な方法）
-        # プロンプトはstdinで渡すため、CLI引数としては含めない
-        cmd_args = [
-            self.claude_code_path,
-            'chat',
-            '--model', self.model,
-            '--no-interactive',
-            '--format', 'plain'
-        ]
-
-        # 注意: --max-tokens は公式でサポートされていない可能性があるため削除
-        # 必要に応じてCLIバージョンチェック後に追加を検討
+        # 動的にバイナリを検出してコマンド引数を構築
+        try:
+            cmd_args = self._detect_binary_and_build_args()
+        except Exception as e:
+            logger.warning(f"動的フラグ検出に失敗、フォールバックを使用: {e}")
+            # フォールバック: 基本的なコマンド引数
+            cmd_args = [
+                self.claude_code_path,
+                '--model', self.model,
+                '--print'  # 非対話モードの一般的なフラグ
+            ]
+            
+            # chatサブコマンドが必要かチェック
+            binary_name = os.path.basename(self.claude_code_path)
+            if binary_name in ['claude-code']:
+                cmd_args.insert(1, 'chat')
 
         # 安全な環境変数の設定
         safe_env = self._create_safe_environment()
