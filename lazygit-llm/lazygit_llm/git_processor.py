@@ -55,7 +55,7 @@ class GitDiffProcessor:
         Git差分プロセッサーを初期化
 
         Args:
-            max_diff_size: 処理する差分の最大サイズ（バイト）
+            max_diff_size: 処理する差分の最大サイズ(バイト)
             enable_parallel_processing: 並行処理を有効にするかどうか
         """
         self.max_diff_size = max_diff_size
@@ -66,11 +66,11 @@ class GitDiffProcessor:
         self._cache_maxsize = 128
         self.security_validator = SecurityValidator()
 
-        # 並行処理用のThreadPoolExecutor（オンデマンド作成）
+        # 並行処理用のThreadPoolExecutor(オンデマンド作成)
         self._executor = None
 
     def _get_executor(self) -> Optional[ThreadPoolExecutor]:
-        """ThreadPoolExecutorを取得（必要時に作成）"""
+        """ThreadPoolExecutorを取得(必要時に作成)"""
         if not self.enable_parallel_processing:
             return None
 
@@ -481,7 +481,7 @@ class GitDiffProcessor:
         if len(diff.encode('utf-8')) <= self.max_diff_size:
             return diff
 
-        # バイト単位で切り詰める（UTF-8/改行境界を優先）
+        # バイト単位で切り詰める(UTF-8/改行境界を優先)
         buf = diff.encode('utf-8')[:self.max_diff_size]
         truncated = buf.decode('utf-8', errors='ignore')
         nl = truncated.rfind('\n')
@@ -514,7 +514,7 @@ class GitDiffProcessor:
         自前LRUキャッシュを使用した差分フォーマット処理
 
         Args:
-            diff_hash: 差分のハッシュ値（キャッシュキーとして使用）
+            diff_hash: 差分のハッシュ値(キャッシュキーとして使用)
             diff: 差分内容
 
         Returns:
@@ -523,7 +523,7 @@ class GitDiffProcessor:
         with self._cache_lock:
             # キャッシュヒット確認
             if diff_hash in self._processing_cache:
-                # LRU更新（最後に移動）
+                # LRU更新(最後に移動)
                 value = self._processing_cache.pop(diff_hash)
                 self._processing_cache[diff_hash] = value
                 return value
@@ -543,7 +543,7 @@ class GitDiffProcessor:
 
     def _format_diff_internal(self, diff: str) -> str:
         """
-        内部的な差分フォーマット処理（キャッシュから呼び出される）
+        内部的な差分フォーマット処理(キャッシュから呼び出される)
 
         Args:
             diff: 差分内容

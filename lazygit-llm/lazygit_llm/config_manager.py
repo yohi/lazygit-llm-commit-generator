@@ -188,9 +188,9 @@ class ConfigManager:
             )
             logger.warning("プロンプトテンプレートが設定されていません。デフォルトを使用します。")
 
-        # $diffプレースホルダーが含まれているかチェック
-        if '$diff' not in template:
-            raise ConfigError("プロンプトテンプレートに$diffプレースホルダーが含まれていません")
+        # {diff} または $diff のいずれかのプレースホルダーが含まれているかチェック
+        if ('{diff}' not in template) and ('$diff' not in template):
+            raise ConfigError("プロンプトテンプレートに{diff} または $diff プレースホルダーが含まれていません")
 
         return template
 
