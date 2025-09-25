@@ -23,7 +23,7 @@ def check_dns_resolution(hostname: str = "google.com") -> Tuple[bool, str]:
         (成功/失敗, メッセージ)
     """
     try:
-        # ホスト名の正規化（前後の空白文字を除去）
+        # ホスト名の正規化(前後の空白文字を除去)
         hostname = hostname.strip()
 
         # ホスト名の基本検証
