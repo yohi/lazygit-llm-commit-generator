@@ -1,0 +1,128 @@
+name: Test Suite
+
+on:
+  pull_request:
+    branches: [ master, main ]
+    paths:
+      - 'lazygit-llm/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'requirements.txt'
+      - '.github/workflows/test.yml'
+  push:
+    branches: [ master, main ]
+    paths:
+      - 'lazygit-llm/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'requirements.txt'
+      - '.github/workflows/test.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        uv sync --extra dev
+        uv pip install -e .
+
+    - name: Lint with flake8
+      run: |
+        uv run flake8 lazygit-llm/lazygit_llm/
+
+    - name: Format check with black
+      run: |
+        uv run black --check lazygit-llm/lazygit_llm/
+
+    - name: Type check with mypy
+      run: |
+        uv run mypy lazygit-llm/lazygit_llm/
+
+    - name: Run unit tests
+      run: |
+        uv run pytest lazygit-llm/tests/ -m unit --cov=lazygit_llm --cov-report=xml --cov-report=term
+
+    - name: Run integration tests
+      run: |
+        uv run pytest lazygit-llm/tests/ -m integration
+
+    - name: Run all tests (excluding slow ones)
+      run: |
+        uv run pytest lazygit-llm/tests/ -m "not slow" --cov=lazygit_llm --cov-report=xml --cov-report=term
+
+    - name: Upload coverage reports to Codecov
+      if: matrix.python-version == '3.11'
+      uses: codecov/codecov-action@v4
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+
+  test-packaging:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        uv sync --extra dev
+
+    - name: Test packaging
+      run: |
+        uv build
+        uv pip install dist/*.whl
+        lazygit-llm-generate --help
+
+    - name: Verify installation
+      run: |
+        python -c "import lazygit_llm; print('Package imported successfully')"
+
+  security-scan:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Run Bandit security scan
+      uses: tj-actions/bandit@v5.1
+      with:
+        options: "-r lazygit-llm/lazygit_llm/ -f json -o bandit-report.json"
+        
+    - name: Upload Bandit scan results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: bandit-report.json
