@@ -200,14 +200,17 @@ class MessageFormatter:
             elif len(clean_line) >= 5:
                 score += 2
 
-            # コロン文字を含む行は説明文である可能性が高いので減点
-            if ':' in clean_line:
-                score -= 3
-
-            # 実際のコミットメッセージっぽい単語があるかチェック
-            commit_words = ['add', 'fix', 'update', 'remove', 'refactor', 'feat', 'chore', 'docs']
-            if any(word in clean_line.lower() for word in commit_words):
-                score += 3
+            # Conventional Commits に一致する行は強く加点
+            if re.match(r'^(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(?:\([\w\-]+\))?: .+', clean_line, flags=re.IGNORECASE):
+                score += 8
+            else:
+                # 実際のコミットメッセージっぽい単語があるかチェック
+                commit_words = [
+                    'add', 'fix', 'update', 'remove', 'refactor', 'feat', 'chore', 'docs',
+                    '追加', '修正', '更新', '削除', '改善', 'リファクタ', 'ドキュメント', '実装', '変更'
+                ]
+                if any(word in clean_line.lower() for word in commit_words):
+                    score += 3
 
             if score > best_score:
                 best_score = score
@@ -220,7 +223,7 @@ class MessageFormatter:
             best_line = re.sub(r' +', ' ', best_line).strip()
 
             # 句読点で分割して最初の文を取得
-            sentence_match = re.match(r'^([^.!?]*[.!?])', best_line)
+            sentence_match = re.match(r'^([^.!?。！？]*[.!?。！？])', best_line)
             if sentence_match:
                 result = sentence_match.group(1).strip()
                 # タブと空白の正規化を再実行
@@ -238,7 +241,7 @@ class MessageFormatter:
             first_line = re.sub(r' +', ' ', first_line).strip()
 
             # 句読点で分割して最初の文を取得
-            sentence_match = re.match(r'^([^.!?]*[.!?])', first_line)
+            sentence_match = re.match(r'^([^.!?。！？]*[.!?。！？])', first_line)
             if sentence_match:
                 result = sentence_match.group(1).strip()
                 # タブと空白の正規化を再実行
@@ -250,7 +253,7 @@ class MessageFormatter:
 
         # フォールバック: 全体から最初の文を抽出
         # 句読点で文を分割
-        sentence_match = re.match(r'^([^.!?]*[.!?])', message)
+        sentence_match = re.match(r'^([^.!?。！？]*[.!?。！？])', message)
         if sentence_match:
             return sentence_match.group(1).strip()
 
@@ -294,19 +297,20 @@ class MessageFormatter:
             # 最後の空白位置を探して、そこまで戻す
             last_space = original_truncated.rfind(' ')
             if last_space >= 0:  # 空白が見つかった場合
-                # 空白位置で切って、末尾に空白を残す（rstripしない）
-                truncated = original_truncated[:last_space + 1]
+                truncated = original_truncated[:last_space].rstrip()
             else:
                 # 空白が見つからない場合は、最初の非英数字文字まで戻す
                 for i in range(len(original_truncated) - 1, -1, -1):
                     if not original_truncated[i].isalnum():
-                        truncated = original_truncated[:i + 1]
+                        truncated = original_truncated[:i + 1].rstrip()
                         break
                 else:
                     # すべて英数字の場合は、安全な長さで切り詰め
-                    safe_length = min(len(original_truncated) - 5, limit - 10)
-                    truncated = original_truncated[:safe_length] + ' '
+                    safe_length = max(0, min(len(original_truncated) - 5, limit - 10))
+                    truncated = original_truncated[:safe_length].rstrip()
 
+        # 末尾の余分な空白を除去してから省略記号を付与
+        truncated = truncated.rstrip()
         truncated += '...'
 
         logger.warning("メッセージが長すぎるため切り詰めました: %d -> %d文字",

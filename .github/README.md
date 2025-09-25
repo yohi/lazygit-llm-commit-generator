@@ -53,10 +53,11 @@ Pull Request の作成・更新時に自動的にテストとコード品質チ�
 - ✅ **コードスタイル**: Black + isort + flake8 準拠
 
 ### 現在の品質状況
-- 🎯 **テスト成功率**: **100%** (47/47 passed)
-- 🔒 **セキュリティスコア**: **クリーン**
-- 📊 **コードカバレッジ**: **100%**
-- 🎨 **コードスタイル**: **準拠済み**
+
+[![CI](https://github.com/yohi/lazygit-llm-commit-generator/workflows/CI/badge.svg)](https://github.com/yohi/lazygit-llm-commit-generator/actions/workflows/ci.yml)
+[![Code Quality](https://github.com/yohi/lazygit-llm-commit-generator/workflows/Code%20Quality/badge.svg)](https://github.com/yohi/lazygit-llm-commit-generator/actions/workflows/code-quality.yml)
+
+> 📊 詳細な品質情報は上記のバッジをクリックして最新のCI/CD結果をご確認ください
 
 ## 🚀 使用方法
 
@@ -108,11 +109,10 @@ bandit -r lazygit-llm/
 
 README に以下のバッジが追加されました：
 
-- **CI/CD Pipeline**: ビルド・テスト状況
-- **Code Quality**: コード品質状況
-- **Python Version**: サポート Python バージョン
-- **Test Coverage**: テストカバレッジ率
-- **Code Style**: コードスタイル準拠状況
+- **CI**: ビルド・テスト・パッケージング・E2E状況（ci.yml）
+- **Code Quality**: コード品質・セキュリティスキャン状況（code-quality.yml）
+
+> 追加のバッジ（Python Version、Test Coverage、Code Style）は将来実装予定です
 
 ## 🔧 カスタマイズ
 

@@ -9,7 +9,7 @@
 ## 🔍 **修正した主要エラー**
 
 ### ❌ **エラー1: actions/upload-artifact v3 廃止エラー**
-```
+```text
 This request has been automatically failed because it uses a deprecated version of `actions/upload-artifact: v3`
 ```
 
@@ -24,7 +24,7 @@ This request has been automatically failed because it uses a deprecated version 
 ---
 
 ### ❌ **エラー2: GitHub Token 権限不足エラー**
-```
+```text
 HttpError: Resource not accessible by integration
 ```
 
