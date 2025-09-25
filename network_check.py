@@ -91,9 +91,12 @@ def ping_test(host: str = "google.com") -> Tuple[bool, str]:
         if host.startswith("-"):
             return False, f"無効なホスト名: {host}"
 
-        # 許可文字チェック (英数字、ドット、ハイフン、コロン)
+        # 許可文字チェック (英数字、ドット、ハイフン、コロン、IPv6ゾーン識別子)
         import re
-        if not re.fullmatch(r"[A-Za-z0-9.-:]+", host):
+        # IPv6ゾーン識別子をサポート: メインアドレス部 + オプションで '%' + ゾーンラベル
+        # ゾーンラベルは英数字、ドット、アンダースコア、ハイフンを許可
+        pattern = r"[A-Za-z0-9.-:]+(?:%[A-Za-z0-9._-]+)?"
+        if not re.fullmatch(pattern, host):
             return False, f"無効なホスト名: {host}"
 
         # Windows/Linux対応
