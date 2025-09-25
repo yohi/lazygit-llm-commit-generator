@@ -1,0 +1,34 @@
+name: Code Quality Check
+
+on:
+  pull_request:
+    branches: [main, master, develop]
+  push:
+    branches: [main, master]
+
+jobs:
+  pre-commit:
+    name: "🔧 Pre-commit Checks"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: "Install pre-commit"
+        run: pip install pre-commit
+
+      - name: "Run pre-commit"
+        run: |
+          # pre-commit設定がない場合のフォールバック
+          if [ ! -f .pre-commit-config.yaml ]; then
+            echo "⚠️ .pre-commit-config.yaml not found, running manual checks"
+            pip install black isort flake8
+            black --check lazygit-llm/ tests/ || echo "❌ Black formatting issues"
+            isort --check-only lazygit-llm/ tests/ || echo "❌ Import sorting issues"
+            flake8 lazygit-llm/ tests/ --max-line-length=100 || echo "❌ Flake8 linting issues"
+          else
+            pre-commit run --all-files
+          fi

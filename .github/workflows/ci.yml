@@ -1,0 +1,341 @@
+name: CI/CD Pipeline
+
+on:
+  pull_request:
+    branches: [main, master, develop]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main, master]
+
+env:
+  # Python設定
+  PYTHON_DEFAULT_VERSION: "3.11"
+  # テスト設定
+  PYTEST_ARGS: "-v --tb=short --strict-markers"
+  # 品質ゲート設定
+  MIN_COVERAGE: 80
+  MAX_COMPLEXITY: 10
+
+jobs:
+  # =============================================================================
+  # Phase 1: 静的解析とコード品質チェック
+  # =============================================================================
+  code-quality:
+    name: "📋 Code Quality & Static Analysis"
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+
+    steps:
+      - name: "🔄 Checkout Code"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "🐍 Setup Python"
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
+          cache: "pip"
+
+      - name: "📦 Install Dependencies"
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install flake8 black isort mypy bandit safety
+
+      - name: "🎨 Code Formatting Check (Black)"
+        run: |
+          black --check --diff lazygit-llm/ tests/ || {
+            echo "❌ Code formatting issues found. Run 'black lazygit-llm/ tests/' to fix."
+            exit 1
+          }
+
+      - name: "📋 Import Sorting Check (isort)"
+        run: |
+          isort --check-only --diff lazygit-llm/ tests/ || {
+            echo "❌ Import sorting issues found. Run 'isort lazygit-llm/ tests/' to fix."
+            exit 1
+          }
+
+      - name: "🔍 Linting (flake8)"
+        run: |
+          flake8 lazygit-llm/ tests/ --max-line-length=100 --max-complexity=${{ env.MAX_COMPLEXITY }} \
+            --ignore=E203,W503,F401 --show-source --statistics
+
+      - name: "🔒 Security Check (Bandit)"
+        run: |
+          bandit -r lazygit-llm/ -f json -o bandit-report.json || true
+          bandit -r lazygit-llm/ --severity-level medium
+
+      - name: "🛡️ Dependency Security Check (Safety)"
+        run: |
+          safety check --json --output safety-report.json || true
+          safety check
+
+      - name: "📊 Upload Security Reports"
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+            safety-report.json
+
+  # =============================================================================
+  # Phase 2: テストマトリクス実行
+  # =============================================================================
+  test-matrix:
+    name: "🧪 Test Suite"
+    runs-on: ${{ matrix.os }}
+    needs: code-quality
+    if: github.event.pull_request.draft == false
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        exclude:
+          # パフォーマンス最適化のため一部組み合わせを除外
+          - os: macos-latest
+            python-version: "3.9"
+          - os: windows-latest
+            python-version: "3.9"
+
+    steps:
+      - name: "🔄 Checkout Code"
+        uses: actions/checkout@v4
+
+      - name: "🐍 Setup Python ${{ matrix.python-version }}"
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: "📦 Install Dependencies"
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-xdist pytest-mock
+
+      - name: "🧪 Run Core Tests (lazygit-llm)"
+        working-directory: lazygit-llm
+        run: |
+          python -m pytest tests/ ${{ env.PYTEST_ARGS }} \
+            --cov=lazygit_llm \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-report=term \
+            --cov-fail-under=${{ env.MIN_COVERAGE }} \
+            --junitxml=test-results-core.xml
+
+      - name: "🧪 Run Integration Tests"
+        run: |
+          python -m pytest tests/integration/ ${{ env.PYTEST_ARGS }} \
+            --junitxml=test-results-integration.xml
+
+      - name: "🧪 Run Performance Tests"
+        run: |
+          python -m pytest tests/performance/ ${{ env.PYTEST_ARGS }} \
+            --junitxml=test-results-performance.xml
+
+      - name: "📊 Upload Test Results"
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results-${{ matrix.os }}-${{ matrix.python-version }}
+          path: |
+            test-results-*.xml
+            lazygit-llm/htmlcov/
+            lazygit-llm/coverage.xml
+
+      - name: "📈 Upload Coverage to Codecov"
+        uses: codecov/codecov-action@v3
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == env.PYTHON_DEFAULT_VERSION
+        with:
+          file: ./lazygit-llm/coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+  # =============================================================================
+  # Phase 3: パッケージングと配布テスト
+  # =============================================================================
+  packaging:
+    name: "📦 Package & Distribution Test"
+    runs-on: ubuntu-latest
+    needs: test-matrix
+    if: github.event.pull_request.draft == false
+
+    steps:
+      - name: "🔄 Checkout Code"
+        uses: actions/checkout@v4
+
+      - name: "🐍 Setup Python"
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
+
+      - name: "📦 Install Build Tools"
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine wheel
+
+      - name: "🔨 Build Package"
+        run: |
+          python -m build
+          ls -la dist/
+
+      - name: "🔍 Check Package"
+        run: |
+          python -m twine check dist/*
+
+      - name: "🧪 Install and Test Package"
+        run: |
+          pip install dist/*.whl
+          python -c "import lazygit_llm; print('✅ Package import successful')"
+
+      - name: "📊 Upload Package Artifacts"
+        uses: actions/upload-artifact@v3
+        with:
+          name: python-package
+          path: dist/
+
+  # =============================================================================
+  # Phase 4: エンドツーエンドテスト
+  # =============================================================================
+  e2e-test:
+    name: "🎯 End-to-End Test"
+    runs-on: ubuntu-latest
+    needs: packaging
+    if: github.event.pull_request.draft == false
+
+    steps:
+      - name: "🔄 Checkout Code"
+        uses: actions/checkout@v4
+
+      - name: "🐍 Setup Python"
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
+
+      - name: "📦 Install Full Dependencies"
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: "🔧 Setup Git for Testing"
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+
+      - name: "🎯 Run E2E Tests"
+        run: |
+          python -m pytest tests/integration/test_end_to_end.py ${{ env.PYTEST_ARGS }} \
+            --junitxml=test-results-e2e.xml
+
+      - name: "📊 Upload E2E Results"
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: e2e-test-results
+          path: test-results-e2e.xml
+
+  # =============================================================================
+  # Phase 5: 最終品質ゲートと成功レポート
+  # =============================================================================
+  quality-gate:
+    name: "🚪 Quality Gate & Success Report"
+    runs-on: ubuntu-latest
+    needs: [code-quality, test-matrix, packaging, e2e-test]
+    if: always() && github.event.pull_request.draft == false
+
+    steps:
+      - name: "📊 Check All Jobs Status"
+        run: |
+          echo "🔍 Checking CI/CD pipeline results..."
+
+          # 各ジョブの結果をチェック
+          CODE_QUALITY="${{ needs.code-quality.result }}"
+          TEST_MATRIX="${{ needs.test-matrix.result }}"
+          PACKAGING="${{ needs.packaging.result }}"
+          E2E_TEST="${{ needs.e2e-test.result }}"
+
+          echo "📋 Code Quality: $CODE_QUALITY"
+          echo "🧪 Test Matrix: $TEST_MATRIX"
+          echo "📦 Packaging: $PACKAGING"
+          echo "🎯 E2E Test: $E2E_TEST"
+
+          # 失敗したジョブがあるかチェック
+          if [[ "$CODE_QUALITY" != "success" ]] || \
+             [[ "$TEST_MATRIX" != "success" ]] || \
+             [[ "$PACKAGING" != "success" ]] || \
+             [[ "$E2E_TEST" != "success" ]]; then
+            echo "❌ CI/CD Pipeline failed. Please check the failed jobs above."
+            exit 1
+          fi
+
+          echo "✅ All quality gates passed!"
+
+      - name: "🎉 Success Summary"
+        if: success()
+        run: |
+          echo "
+          🎉 **CI/CD Pipeline Success!** 🎉
+
+          ✅ **Code Quality**: Passed
+          ✅ **Test Matrix**: All tests passed across multiple Python versions and OS
+          ✅ **Package Build**: Successfully built and verified
+          ✅ **E2E Testing**: End-to-end functionality confirmed
+
+          🚀 **Ready for merge!** This PR maintains the high quality standards.
+
+          📊 **Quality Metrics Achieved**:
+          - 🎯 100% Test Success Rate
+          - 🔒 Security Checks Passed
+          - 📦 Package Build Verified
+          - 🧪 Multi-platform Compatibility Confirmed
+          "
+
+  # =============================================================================
+  # 自動コメント（PR作成者への通知）
+  # =============================================================================
+  pr-comment:
+    name: "💬 PR Notification"
+    runs-on: ubuntu-latest
+    needs: quality-gate
+    if: always() && github.event_name == 'pull_request'
+
+    steps:
+      - name: "💬 Comment on PR"
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const success = '${{ needs.quality-gate.result }}' === 'success';
+            const emoji = success ? '✅' : '❌';
+            const status = success ? 'PASSED' : 'FAILED';
+            const color = success ? '🟢' : '🔴';
+
+            const comment = `
+            ${emoji} **CI/CD Pipeline ${status}** ${color}
+
+            ### 📊 Pipeline Results
+            - **Code Quality**: ${{ needs.code-quality.result }}
+            - **Test Matrix**: ${{ needs.test-matrix.result }}
+            - **Packaging**: ${{ needs.packaging.result }}
+            - **E2E Test**: ${{ needs.e2e-test.result }}
+
+            ${success ?
+              '🎉 **All checks passed!** Your changes maintain the high quality standards.' :
+              '⚠️ **Some checks failed.** Please review the failed jobs and fix the issues.'
+            }
+
+            💡 **View detailed results**: [CI/CD Pipeline](${context.payload.pull_request.html_url}/checks)
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
