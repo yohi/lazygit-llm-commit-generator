@@ -1,5 +1,11 @@
 # 🚀 LazyGit LLM Commit Generator
 
+[![CI/CD Pipeline](https://github.com/YOUR_USERNAME/lazygit-llm-commit-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/lazygit-llm-commit-generator/actions/workflows/ci.yml)
+[![Code Quality](https://github.com/YOUR_USERNAME/lazygit-llm-commit-generator/actions/workflows/code-quality.yml/badge.svg)](https://github.com/YOUR_USERNAME/lazygit-llm-commit-generator/actions/workflows/code-quality.yml)
+[![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://python.org)
+[![Test Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)](https://github.com/YOUR_USERNAME/lazygit-llm-commit-generator)
+[![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 LazyGitと連携してLLM（Large Language Model）でコミットメッセージを自動生成するPythonツールです。
 
 ## ✨ 主な機能

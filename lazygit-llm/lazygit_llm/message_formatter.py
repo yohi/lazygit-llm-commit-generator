@@ -98,35 +98,164 @@ class MessageFormatter:
         Returns:
             抽出されたコミットメッセージ
         """
-        # マークダウンのコードブロックを除去
+        # 最初にマークダウンのコードブロックを除去
         message = re.sub(r'```[\s\S]*?```', '', message)
 
-        # 代表的な前置き文言を包括的に除去（英日・表記ゆれ対応）
-        prefix_pattern = re.compile(
-            r'^\s*(?:'
-            r'git\s+commit\s+-m|'
-            r'(?:suggested\s+)?commit\s+(?:message|messages|msg)\s*[:\-]|'
-            r'commit\s*[:\-]|'
-            r'(?:here\s+is\s+the\s+)?commit\s+message\s*[:\-]|'
+        # 前置き文言を引用符処理より先に除去
+        prefix_patterns = [
+            r'git\s+commit\s+-m',
+            r'(?:suggested\s+)?commit\s+(?:message|messages|msg)\s*[:\-]',
+            r'commit\s*[:\-]',
+            r'(?:here\s+is\s+(?:the\s+)?)?commit\s+message\s*[:\-]',
+            r'(?:here\s+is\s+your\s+)?commit\s+message\s*[:\-]',
+            r'generated\s+commit\s+message\s*[:\-]',
+            r'suggested\s+message\s*[:\-]',
             r'コミット(?:メッセージ)?\s*[:\-]'
-            r')\s*',
-            re.IGNORECASE,
-        )
-        message = prefix_pattern.sub('', message, count=1)
+        ]
 
-        # 引用符（ASCII/Unicode/日本語）を除去
-        message = message.strip().strip('"\u201C\u201D\'\u2018\u2019`\u300C\u300D\u300E\u300F')
+        for pattern in prefix_patterns:
+            message = re.sub(f'^\\s*{pattern}\\s*', '', message, count=1, flags=re.IGNORECASE)
 
-        # 最初の行を取得(複数行の場合)
-        first_line = message.split('\n')[0].strip()
+        # インラインコードの除去は引用符処理後に実行
+        # （バッククォート引用符との競合を避けるため）
 
-        if first_line:
-            return first_line
+        # 引用符の除去（前置き文言除去後に実施）
+        message = message.strip()
+
+        # 三重引用符の処理（最優先）
+        triple_quotes = ['"""', "'''"]
+        for quote in triple_quotes:
+            if message.startswith(quote) and message.endswith(quote) and len(message) > len(quote) * 2:
+                message = message[len(quote):-len(quote)].strip()
+                break
+        else:
+            # 通常の引用符処理（対になったもの＋部分的な非対称引用符対応）
+            quote_pairs = [
+                ('"', '"'), ("'", "'"), ('`', '`'),
+                ('「', '」'), ('『', '』')
+            ]
+
+            # 1. 完全対称引用符の処理
+            for start_quote, end_quote in quote_pairs:
+                if (message.startswith(start_quote) and message.endswith(end_quote)
+                    and len(message) > len(start_quote) + len(end_quote)):
+                    message = message[len(start_quote):-len(end_quote)].strip()
+                    # 引用符内の改行とタブを空白に変換
+                    message = message.replace('\n', ' ').replace('\t', ' ')
+                    message = re.sub(r' +', ' ', message).strip()
+                    break
+            else:
+                # 2. 非対称引用符の部分対応（開始引用符のみ除去）
+                for start_quote, _ in quote_pairs:
+                    if message.startswith(start_quote) and len(message) > len(start_quote):
+                        # 開始引用符を除去し、末尾の異なる引用符もチェック
+                        temp_message = message[len(start_quote):]
+                        for _, end_quote in quote_pairs:
+                            if temp_message.endswith(end_quote) and len(temp_message) > len(end_quote):
+                                message = temp_message[:-len(end_quote)].strip()
+                                # 非対称引用符処理でも改行とタブを空白に変換
+                                message = message.replace('\n', ' ').replace('\t', ' ')
+                                message = re.sub(r' +', ' ', message).strip()
+                                break
+                        else:
+                            message = temp_message.strip()
+                            # 非対称引用符処理でも改行とタブを空白に変換
+                            message = message.replace('\n', ' ').replace('\t', ' ')
+                            message = re.sub(r' +', ' ', message).strip()
+                        break
+
+        # 引用符処理後にインラインコードを除去
+        message = re.sub(r'`[^`]*`', '', message)
+
+        # 改行の正規化（行分割準備）
+        message = re.sub(r'\n\s*\n', '\n', message)
+        message = re.sub(r'\n+', '\n', message).strip()
+
+        # 前置き文言の除去は既に上で実行済み
+
+        # 改行で区切られた行を処理
+        lines = [line.strip() for line in message.split('\n') if line.strip()]
+
+        if not lines:
+            # すべてのコンテンツが除去された場合は空文字を返す
+            return ""
+
+        # 最も意味のありそうな行を選択
+        best_line = ""
+        best_score = 0
+
+        for line in lines:
+            score = 0
+            # プレフィックスが残っていないかチェック
+            clean_line = line
+            for pattern in prefix_patterns:
+                old_line = clean_line
+                clean_line = re.sub(f'^\\s*{pattern}\\s*', '', clean_line, count=1, flags=re.IGNORECASE)
+                if clean_line != old_line:
+                    score += 10  # プレフィックスが除去された行は高スコア
+
+            # 長さによるスコアリング（短すぎず長すぎないものを優先）
+            if len(clean_line) >= 10:
+                score += 5
+            elif len(clean_line) >= 5:
+                score += 2
+
+            # Conventional Commits に一致する行は強く加点
+            if re.match(r'^(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(?:\([\w\-]+\))?: .+', clean_line, flags=re.IGNORECASE):
+                score += 8
+            else:
+                # 実際のコミットメッセージっぽい単語があるかチェック
+                commit_words = [
+                    'add', 'fix', 'update', 'remove', 'refactor', 'feat', 'chore', 'docs',
+                    '追加', '修正', '更新', '削除', '改善', 'リファクタ', 'ドキュメント', '実装', '変更'
+                ]
+                if any(word in clean_line.lower() for word in commit_words):
+                    score += 3
+
+            if score > best_score:
+                best_score = score
+                best_line = clean_line
+
+        # 最高スコアの行があれば、それが複数の文を含んでいるかチェック
+        if best_line:
+            # タブと空白の正規化を実行
+            best_line = best_line.replace('\t', ' ')
+            best_line = re.sub(r' +', ' ', best_line).strip()
+
+            # 句読点で分割して最初の文を取得
+            sentence_match = re.match(r'^([^.!?。！？]*[.!?。！？])', best_line)
+            if sentence_match:
+                result = sentence_match.group(1).strip()
+                # タブと空白の正規化を再実行
+                result = result.replace('\t', ' ')
+                result = re.sub(r' +', ' ', result).strip()
+                return result
+            else:
+                return best_line
+
+        # フォールバック：最初の行
+        if lines:
+            first_line = lines[0]
+            # タブと空白の正規化を実行
+            first_line = first_line.replace('\t', ' ')
+            first_line = re.sub(r' +', ' ', first_line).strip()
+
+            # 句読点で分割して最初の文を取得
+            sentence_match = re.match(r'^([^.!?。！？]*[.!?。！？])', first_line)
+            if sentence_match:
+                result = sentence_match.group(1).strip()
+                # タブと空白の正規化を再実行
+                result = result.replace('\t', ' ')
+                result = re.sub(r' +', ' ', result).strip()
+                return result
+            else:
+                return first_line
 
         # フォールバック: 全体から最初の文を抽出
-        sentences = re.split(r'[.!?]\s+', message)
-        if sentences and sentences[0].strip():
-            return sentences[0].strip()
+        # 句読点で文を分割
+        sentence_match = re.match(r'^([^.!?。！？]*[.!?。！？])', message)
+        if sentence_match:
+            return sentence_match.group(1).strip()
 
         return message.strip()
 
@@ -146,15 +275,43 @@ class MessageFormatter:
         # 省略記号分を確保（上限3未満はそのまま切り取り）
         if self.max_length <= 3:
             return message[:self.max_length]
-        limit = self.max_length - 3
+
+        limit = self.max_length - 3  # "..." 分を確保
         truncated = message[:limit]
+
+        # 単語境界での切り詰めを試行
         last_space = truncated.rfind(' ')
 
-        if last_space > int(limit * 0.7):  # 70%以上の位置に空白がある場合
+        # 70%以上の位置に空白がある場合は単語境界で切り詰め
+        if last_space > int(limit * 0.7):
             truncated = truncated[:last_space]
+            # さらに確実に単語境界で終わることを保証
+            truncated = truncated.rstrip()
 
-        # 末尾の句読点を除去して省略記号を追加(最終長は必ず self.max_length 以下)
-        truncated = truncated.rstrip('.,!?;:').rstrip() + '...'
+        # 末尾の句読点と空白を除去（ただし単語境界を保持）
+        original_truncated = truncated
+        truncated = truncated.rstrip('.,!?;: ')
+
+        # 句読点除去後に英数字で終わる場合は、前の空白まで戻す
+        if truncated and truncated[-1].isalnum():
+            # 最後の空白位置を探して、そこまで戻す
+            last_space = original_truncated.rfind(' ')
+            if last_space >= 0:  # 空白が見つかった場合
+                truncated = original_truncated[:last_space].rstrip()
+            else:
+                # 空白が見つからない場合は、最初の非英数字文字まで戻す
+                for i in range(len(original_truncated) - 1, -1, -1):
+                    if not original_truncated[i].isalnum():
+                        truncated = original_truncated[:i + 1].rstrip()
+                        break
+                else:
+                    # すべて英数字の場合は、安全な長さで切り詰め
+                    safe_length = max(0, min(len(original_truncated) - 5, limit - 10))
+                    truncated = original_truncated[:safe_length].rstrip()
+
+        # 末尾の余分な空白を除去してから省略記号を付与
+        truncated = truncated.rstrip()
+        truncated += '...'
 
         logger.warning("メッセージが長すぎるため切り詰めました: %d -> %d文字",
                       len(message), len(truncated))
