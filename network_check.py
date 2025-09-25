@@ -23,6 +23,9 @@ def check_dns_resolution(hostname: str = "google.com") -> Tuple[bool, str]:
         (成功/失敗, メッセージ)
     """
     try:
+        # ホスト名の正規化（前後の空白文字を除去）
+        hostname = hostname.strip()
+
         # ホスト名の基本検証
         if not hostname or len(hostname) > 255:
             return False, f"無効なホスト名: {hostname}"
