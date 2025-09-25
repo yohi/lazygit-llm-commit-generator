@@ -119,7 +119,7 @@ def ping_test(host: str = "google.com") -> Tuple[bool, str]:
     except subprocess.TimeoutExpired:
         return False, f"Pingタイムアウト: {host}"
     except (subprocess.SubprocessError, OSError) as e:
-        return False, f"Pingエラー: {host} ({str(e)})"
+        return False, f"Pingエラー: {host} ({e!s})"
 
 
 def comprehensive_network_check() -> List[Tuple[str, bool, str]]:
