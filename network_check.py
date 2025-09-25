@@ -27,8 +27,12 @@ def check_dns_resolution(hostname: str = "google.com") -> Tuple[bool, str]:
         if not hostname or len(hostname) > 255:
             return False, f"無効なホスト名: {hostname}"
 
-        socket.gethostbyname(hostname)
-        return True, f"DNS解決成功: {hostname}"
+        # IPv4/IPv6対応のDNS解決
+        addr_info = socket.getaddrinfo(hostname, None, family=socket.AF_UNSPEC, type=socket.SOCK_STREAM)
+        if addr_info:
+            return True, f"DNS解決成功: {hostname}"
+        else:
+            return False, f"DNS解決失敗: {hostname} (アドレス情報が見つかりません)"
     except socket.gaierror as e:
         return False, f"DNS解決失敗: {hostname} ({e!s})"
     except (UnicodeError, ValueError):

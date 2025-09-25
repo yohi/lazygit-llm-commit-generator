@@ -232,7 +232,6 @@ class ConfigManager:
 
         # {diff} または $diff のいずれかのプレースホルダーが含まれているかチェック
         if ('{diff}' not in template) and ('$diff' not in template):
-            logger = logging.getLogger(__name__)
             logger.warning("プロンプトテンプレートに {diff} または $diff が無いため、末尾に自動追加します。")
             template = f"{template.rstrip()}\n\n$diff\n"
 
