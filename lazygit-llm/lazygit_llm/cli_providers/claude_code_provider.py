@@ -67,6 +67,9 @@ class ClaudeCodeProvider(BaseProvider):
         except (ValueError, TypeError):
             timeout_value = self.DEFAULT_TIMEOUT
 
+        # 下限ガード（負値や0は無効）
+        if timeout_value <= 0:
+            timeout_value = self.DEFAULT_TIMEOUT
         self.cli_timeout = min(timeout_value, self.MAX_TIMEOUT)
 
         # claude-codeバイナリの検証
@@ -256,8 +259,11 @@ class ClaudeCodeProvider(BaseProvider):
             resolved = Path(binary_path).resolve()
             resolved_path = str(resolved)
 
-            # 許可バイナリ名の確認
-            if os.path.basename(resolved_path) not in self.ALLOWED_BINARIES:
+            # 許可バイナリ名の確認(Windows拡張子対応)
+            base_name = os.path.basename(resolved_path)
+            normalized_name = Path(base_name).stem.lower()  # Windowsの.exe等を吸収
+            allowed = {name.lower() for name in self.ALLOWED_BINARIES}
+            if normalized_name not in allowed:
                 raise ProviderError(f"許可されていないバイナリ名です: {resolved_path}")
 
             # 危険なパスのチェック (強化版)
@@ -324,11 +330,13 @@ class ClaudeCodeProvider(BaseProvider):
         Raises:
             ProviderError: バイナリ検出またはフラグ検証エラー
         """
-        # バイナリパスから実際のコマンド名を取得
-        binary_name = os.path.basename(self.claude_code_path)
+        # バイナリパスから実際のコマンド名を取得(拡張子を除去して判定用に正規化)
+        binary_path = Path(self.claude_code_path)
+        binary_name = binary_path.name
+        binary_base = binary_path.stem.lower()
 
         # 基本のコマンド引数
-        base_args = [self.claude_code_path]
+        base_args = [str(binary_path)]
 
         try:
             # --helpでサポートされているフラグを確認
@@ -377,7 +385,7 @@ class ClaudeCodeProvider(BaseProvider):
         cmd_args = base_args.copy()
 
         # chatコマンドが利用可能かチェック (claude-codeの場合)
-        if 'chat' in help_lower or binary_name in ['claude-code']:
+        if 'chat' in help_lower or binary_base == 'claude-code':
             cmd_args.append('chat')
 
         # モデル指定
@@ -427,8 +435,8 @@ class ClaudeCodeProvider(BaseProvider):
             ]
 
             # chatサブコマンドが必要かチェック
-            binary_name = os.path.basename(self.claude_code_path)
-            if binary_name in ['claude-code']:
+            binary_base = Path(self.claude_code_path).stem.lower()
+            if binary_base == 'claude-code':
                 cmd_args.insert(1, 'chat')
 
         # 安全な環境変数の設定

@@ -48,11 +48,9 @@ def check_internet_connectivity(host: str = "8.8.8.8", port: int = 53, timeout: 
         (成功/失敗, メッセージ)
     """
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.settimeout(timeout)
-            sock.connect((host, port))
-        return True, f"インターネット接続確認済み: {host}:{port}"
-    except socket.error as e:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True, f"インターネット接続確認済み: {host}:{port}"
+    except OSError as e:
         return False, f"インターネット接続失敗: {host}:{port} ({e!s})"
 
 

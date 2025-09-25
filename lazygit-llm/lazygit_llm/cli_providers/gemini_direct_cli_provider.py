@@ -106,7 +106,7 @@ class GeminiDirectCLIProvider(BaseProvider):
         except (AuthenticationError, ProviderTimeoutError, ResponseError, ProviderError):
             raise
         except subprocess.TimeoutExpired as e:
-            logger.error("Geminiコマンドがタイムアウト: %s", e)
+            logger.exception("Geminiコマンドがタイムアウト")
             raise ProviderTimeoutError(
                 f"Gemini Direct CLIタイムアウト (制限時間: {self.cli_timeout}秒)\n"
                 "ネットワーク接続を確認するか、設定ファイルでtimeout値を増やしてください"
@@ -114,7 +114,7 @@ class GeminiDirectCLIProvider(BaseProvider):
         except subprocess.CalledProcessError as e:
             stderr_output = e.stderr if e.stderr else ""
             stdout_output = e.stdout if e.stdout else ""
-            logger.error("Geminiコマンド実行エラー: returncode=%s, stderr=%s", e.returncode, stderr_output)
+            logger.exception("Geminiコマンド実行エラー: returncode=%s, stderr=%s", e.returncode, stderr_output)
 
             # エラーの種類に応じた詳細なメッセージ
             if "quota exceeded" in stderr_output.lower() or "429" in stderr_output or "rate limit" in stderr_output.lower():
@@ -221,6 +221,49 @@ class GeminiDirectCLIProvider(BaseProvider):
 
         return result.stdout
 
+    def _sanitize_command_for_logging(self, cmd: list) -> str:
+        """
+        ログ出力用にコマンドラインを安全にサニタイズ
+        
+        Args:
+            cmd: コマンドライン引数のリスト
+            
+        Returns:
+            サニタイズされたコマンド文字列
+        """
+        if not cmd:
+            return ""
+            
+        sanitized = [cmd[0]]  # バイナリパスは保持
+        
+        i = 1
+        while i < len(cmd):
+            arg = cmd[i]
+            # --prompt/-p と = 形式をサニタイズ
+            if arg in ('-p', '--prompt'):
+                value = cmd[i + 1] if i + 1 < len(cmd) else ''
+                sanitized.append(arg)
+                if value == '-' or value == '':
+                    sanitized.append(value or '')
+                elif len(value) > 50:
+                    sanitized.append('[REDACTED_PROMPT]')
+                else:
+                    sanitized.append(f'{value[:20]}...')
+                i += 2
+                continue
+            if arg.startswith('--prompt=') or arg.startswith('-p='):
+                opt = arg.split('=', 1)[0]
+                sanitized.append(f'{opt}=[REDACTED_PROMPT]')
+                i += 1
+                continue
+            if len(arg) > 100:
+                sanitized.append('[LONG_ARGUMENT]')
+            else:
+                sanitized.append(arg)
+            i += 1
+            
+        return " ".join(sanitized)
+
     def _execute_with_args(self, prompt: str, timeout: int) -> str:
         """コマンド引数でgeminiコマンドを実行"""
         # このgemini CLIの実際の引数構造に合わせて構築
@@ -230,7 +273,7 @@ class GeminiDirectCLIProvider(BaseProvider):
         if self.model != 'gemini-1.5-pro':
             cmd.extend(['-m', self.model])
 
-        # プロンプト指定（--prompt を使用）
+        # プロンプト指定(--prompt を使用)
         cmd.extend(['--prompt', prompt])
 
         # 環境変数設定 (APIキーがある場合)
@@ -239,7 +282,8 @@ class GeminiDirectCLIProvider(BaseProvider):
             env['GEMINI_API_KEY'] = self.api_key
             env['GOOGLE_API_KEY'] = self.api_key
 
-        logger.debug(f"小さなプロンプト({len(prompt)}bytes)をコマンド引数で実行")
+        size_bytes = len(prompt.encode('utf-8'))
+        logger.debug(f"小さなプロンプト({size_bytes} bytes)実行: %s", self._sanitize_command_for_logging(cmd))
 
         result = subprocess.run(
             cmd,
