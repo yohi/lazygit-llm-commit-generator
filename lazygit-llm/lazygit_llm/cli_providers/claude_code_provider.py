@@ -10,6 +10,7 @@ import logging
 import time
 import os
 import shutil
+import tempfile
 from typing import Dict, Any, Optional, List, ClassVar
 from pathlib import Path
 
@@ -28,10 +29,10 @@ class ClaudeCodeProvider(BaseProvider):
 
     # セキュリティ設定
     ALLOWED_BINARIES: ClassVar[tuple[str, ...]] = ('claude-code', 'claude')
-    MAX_STDOUT_SIZE: ClassVar[int] = 2 * 1024 * 1024  # 2MB（Claudeの長い出力に対応）
+    MAX_STDOUT_SIZE: ClassVar[int] = 2 * 1024 * 1024  # 2MB (Claudeの長い出力に対応)
     MAX_STDERR_SIZE: ClassVar[int] = 1024 * 1024      # 1MB
-    DEFAULT_TIMEOUT: ClassVar[int] = 45  # 45秒（Claudeは処理が重い場合がある）
-    MAX_TIMEOUT: ClassVar[int] = 600     # 10分（設定可能な最大値）
+    DEFAULT_TIMEOUT: ClassVar[int] = 45  # 45秒 (Claudeは処理が重い場合がある)
+    MAX_TIMEOUT: ClassVar[int] = 600     # 10分 (設定可能な最大値)
 
     def __init__(self, config: Dict[str, Any]):
         """
@@ -46,7 +47,7 @@ class ClaudeCodeProvider(BaseProvider):
         # デフォルト値を設定してからsuper().__init__を呼び出し
         config.setdefault('model_name', 'claude-3-5-sonnet-20241022')
         config.setdefault('additional_params', {})
-        
+
         super().__init__(config)
 
         # 設定の検証
@@ -65,7 +66,10 @@ class ClaudeCodeProvider(BaseProvider):
             timeout_value = int(config.get('timeout', self.DEFAULT_TIMEOUT))
         except (ValueError, TypeError):
             timeout_value = self.DEFAULT_TIMEOUT
-        
+
+        # 下限ガード（負値や0は無効）
+        if timeout_value <= 0:
+            timeout_value = self.DEFAULT_TIMEOUT
         self.cli_timeout = min(timeout_value, self.MAX_TIMEOUT)
 
         # claude-codeバイナリの検証
@@ -109,7 +113,7 @@ class ClaudeCodeProvider(BaseProvider):
             elapsed_time = time.time() - start_time
             logger.info(f"Claude Code CLI呼び出し完了: {elapsed_time:.2f}秒")
 
-            # レスポンスの検証（最小限）
+            # レスポンスの検証 (最小限)
             if not response or not response.strip():
                 raise ResponseError("Claude Code CLIから無効なレスポンスを受信しました")
 
@@ -169,7 +173,7 @@ class ClaudeCodeProvider(BaseProvider):
         ストリーミング出力をサポートするかどうか
 
         Returns:
-            Claude Code CLIはストリーミングをサポートしない（通常のCLI呼び出しのため）
+            Claude Code CLIはストリーミングをサポートしない (通常のCLI呼び出しのため)
         """
         return False
 
@@ -195,7 +199,7 @@ class ClaudeCodeProvider(BaseProvider):
         # 候補となるバイナリ名
         binary_candidates = ['claude-code', 'claude']
 
-        # 明示的なパスのリスト（優先順位順）
+        # 明示的なパスのリスト (優先順位順)
         explicit_paths = [
             '/usr/local/bin/claude-code',
             '/usr/bin/claude-code',
@@ -251,19 +255,63 @@ class ClaudeCodeProvider(BaseProvider):
             if not os.access(binary_path, os.X_OK):
                 raise ProviderError(f"バイナリに実行権限がありません: {binary_path}")
 
-            # パスの正規化（シンボリックリンクの解決）
+            # パスの正規化 (シンボリックリンクの解決)
             resolved = Path(binary_path).resolve()
             resolved_path = str(resolved)
 
-            # 許可バイナリ名の確認
-            if os.path.basename(resolved_path) not in self.ALLOWED_BINARIES:
+            # 許可バイナリ名の確認(Windows拡張子対応)
+            base_name = os.path.basename(resolved_path)
+            normalized_name = Path(base_name).stem.lower()  # Windowsの.exe等を吸収
+            allowed = {name.lower() for name in self.ALLOWED_BINARIES}
+            if normalized_name not in allowed:
                 raise ProviderError(f"許可されていないバイナリ名です: {resolved_path}")
 
-            # 危険なパスのチェック
-            dangerous_patterns = ['/tmp/', '/var/tmp/']
-            for pattern in dangerous_patterns:
-                if pattern in resolved_path:
-                    raise ProviderError(f"危険なパスが検出されました: {resolved_path}")
+            # 危険なパスのチェック (強化版)
+            # 注意: resolved は絶対パスなので、トラバーサル(../, ./)の検出は不要
+            dangerous_prefixes = [
+                str(Path(tempfile.gettempdir())) + os.sep,
+                '/var/tmp' + os.sep,
+                '/dev/shm' + os.sep,
+                '/proc' + os.sep,
+                '/sys' + os.sep,
+                '/run/user' + os.sep,
+                '/private/tmp' + os.sep,
+                str(Path.home() / '.cache') + os.sep,
+                str(Path.home() / 'Library' / 'Caches') + os.sep,  # macOS
+            ]
+
+            resolved_path_str = str(resolved_path)
+            for prefix in dangerous_prefixes:
+                if resolved_path_str.startswith(prefix):
+                    raise ProviderError("危険なディレクトリが検出されました")
+
+            # 安全なディレクトリの確認 (whitelist approach) - HOME配下は除外
+            safe_directories = [
+                '/usr/local/bin/', '/usr/local/Cellar/', '/usr/bin/', '/opt/', '/usr/sbin/',
+                '/bin/', '/sbin/', '/opt/homebrew/bin/',
+            ]
+            # Windows の標準ディレクトリも許可
+            if os.name == 'nt':
+                safe_directories += [r'C:\Program Files' + os.sep, r'C:\Program Files (x86)' + os.sep]
+
+            is_safe_directory = any(resolved_path_str.startswith(safe_dir) for safe_dir in safe_directories)
+            if not is_safe_directory:
+                raise ProviderError("安全でないディレクトリが検出されました")
+
+            # ファイル所有者とパーミッションの検証 (Windows互換)
+            try:
+                stat_info = resolved.stat()
+                mode = stat_info.st_mode
+                # 他のユーザーが書き込み可能でないことを確認
+                if mode & 0o002:  # world-writable
+                    raise ProviderError("バイナリが誰でも書き込み可能です")
+                # グループ書き込み可能の場合の追加検査 (POSIXのみ)
+                if (mode & 0o020) and hasattr(os, "getuid"):
+                    current_uid = os.getuid()
+                    if stat_info.st_uid != 0 and stat_info.st_uid != current_uid:
+                        raise ProviderError("バイナリの権限が安全ではありません")
+            except (OSError, AttributeError) as e:
+                logger.warning(f"ファイル権限の検証をスキップ: {e}")
 
             logger.debug(f"バイナリセキュリティ検証完了: {resolved_path}")
 
@@ -282,12 +330,14 @@ class ClaudeCodeProvider(BaseProvider):
         Raises:
             ProviderError: バイナリ検出またはフラグ検証エラー
         """
-        # バイナリパスから実際のコマンド名を取得
-        binary_name = os.path.basename(self.claude_code_path)
-        
+        # バイナリパスから実際のコマンド名を取得(拡張子を除去して判定用に正規化)
+        binary_path = Path(self.claude_code_path)
+        binary_name = binary_path.name
+        binary_base = binary_path.stem.lower()
+
         # 基本のコマンド引数
-        base_args = [self.claude_code_path]
-        
+        base_args = [str(binary_path)]
+
         try:
             # --helpでサポートされているフラグを確認
             help_result = subprocess.run(
@@ -297,59 +347,59 @@ class ClaudeCodeProvider(BaseProvider):
                 timeout=10,
                 shell=False
             )
-            
+
             help_output = help_result.stdout + help_result.stderr
             logger.debug(f"Claude Code CLI ヘルプ出力を確認: {binary_name}")
-            
+
         except subprocess.TimeoutExpired:
             logger.warning("Claude Code CLI --help がタイムアウト、デフォルトフラグを使用")
             help_output = ""
         except Exception as e:
             logger.warning(f"Claude Code CLI --help 実行エラー: {e}, デフォルトフラグを使用")
             help_output = ""
-        
+
         # フラグの可用性を確認
         flags = {
             'print_flag': None,      # 非対話モード: -p, --print
             'output_format': None,   # 出力形式: --output-format
             'model_flag': None       # モデル指定: --model
         }
-        
+
         help_lower = help_output.lower()
-        
+
         # 非対話モードフラグの検出
         if '-p, --print' in help_lower or '--print' in help_lower:
             flags['print_flag'] = '--print'
         elif '-p' in help_lower:
             flags['print_flag'] = '-p'
-        
+
         # 出力形式フラグの検出
         if '--output-format' in help_lower:
             flags['output_format'] = 'text'  # text/json/stream-json
-        
+
         # モデルフラグの検出
         if '--model' in help_lower:
             flags['model_flag'] = True
-        
+
         # コマンド引数の構築
         cmd_args = base_args.copy()
-        
-        # chatコマンドが利用可能かチェック（claude-codeの場合）
-        if 'chat' in help_lower or binary_name in ['claude-code']:
+
+        # chatコマンドが利用可能かチェック (claude-codeの場合)
+        if 'chat' in help_lower or binary_base == 'claude-code':
             cmd_args.append('chat')
-        
+
         # モデル指定
         if flags['model_flag']:
             cmd_args.extend(['--model', self.model])
-        
+
         # 非対話モード
         if flags['print_flag']:
             cmd_args.append(flags['print_flag'])
-        
-        # 出力形式（利用可能な場合）
+
+        # 出力形式 (利用可能な場合)
         if flags['output_format']:
             cmd_args.extend(['--output-format', flags['output_format']])
-        
+
         logger.debug(f"構築されたコマンド引数: {' '.join(cmd_args[:4])}... (プロンプトはstdin経由)")
         return cmd_args
 
@@ -383,10 +433,10 @@ class ClaudeCodeProvider(BaseProvider):
                 '--model', self.model,
                 '--print'  # 非対話モードの一般的なフラグ
             ]
-            
+
             # chatサブコマンドが必要かチェック
-            binary_name = os.path.basename(self.claude_code_path)
-            if binary_name in ['claude-code']:
+            binary_base = Path(self.claude_code_path).stem.lower()
+            if binary_base == 'claude-code':
                 cmd_args.insert(1, 'chat')
 
         # 安全な環境変数の設定
@@ -395,7 +445,7 @@ class ClaudeCodeProvider(BaseProvider):
         try:
             logger.debug(f"claude-codeコマンド実行: {' '.join(cmd_args[:3])}... (プロンプトはstdin経由)")
 
-            # subprocess実行（セキュリティ要件に準拠）
+            # subprocess実行 (セキュリティ要件に準拠)
             result = subprocess.run(
                 cmd_args,
                 input=sanitized_prompt,  # プロンプトをstdinに渡す
@@ -432,7 +482,7 @@ class ClaudeCodeProvider(BaseProvider):
             if not response:
                 raise ResponseError("claude-codeから空のレスポンスを受信しました")
 
-            # 安全メタデータのみログ出力（内容は記録しない）
+            # 安全メタデータのみログ出力 (内容は記録しない)
             logger.info(f"claude-codeコマンド成功: exit_code={result.returncode}, response_length={len(response)}")
 
             return response
@@ -468,7 +518,7 @@ class ClaudeCodeProvider(BaseProvider):
         for char in dangerous_chars:
             sanitized = sanitized.replace(char, '')
 
-        # 長さ制限（Claudeは長いコンテキストを扱えるため、より大きな制限）
+        # 長さ制限 (Claudeは長いコンテキストを扱えるため、より大きな制限)
         max_prompt_length = 100000  # 100KB制限
         if len(sanitized) > max_prompt_length:
             sanitized = sanitized[:max_prompt_length]
@@ -518,8 +568,8 @@ class ClaudeCodeProvider(BaseProvider):
 
         Args:
             output: 出力テキスト
-            max_size: 最大サイズ（バイト）
-            output_type: 出力タイプ（ログ用）
+            max_size: 最大サイズ (バイト)
+            output_type: 出力タイプ (ログ用)
 
         Returns:
             切り詰められた出力

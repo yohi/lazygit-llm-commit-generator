@@ -20,7 +20,30 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ProviderConfig:
-    """プロバイダー設定データクラス"""
+    """
+    プロバイダー設定を表すデータクラス。
+
+    LLMプロバイダーの動作に必要な全ての設定パラメータを保持します。
+    APIキーの安全な管理と、プロバイダー固有のパラメータをサポートします。
+
+    Attributes:
+        name (str): プロバイダー名(例: "openai", "anthropic", "gemini")
+        type (str): プロバイダータイプ("api" または "cli")
+        model (str): 使用するモデル名(例: "gpt-4", "claude-3-sonnet")
+        api_key (Optional[str]): APIキー(CLI型プロバイダーではNone)
+        timeout (int): リクエストタイムアウト時間(秒)。デフォルト: 30
+        max_tokens (int): 最大生成トークン数。デフォルト: 100
+        additional_params (Dict[str, Any]): プロバイダー固有の追加パラメータ
+
+    Example:
+        >>> config = ProviderConfig(
+        ...     name="openai",
+        ...     type="api",
+        ...     model="gpt-4",
+        ...     api_key="sk-...",
+        ...     additional_params={"temperature": 0.3}
+        ... )
+    """
     name: str
     type: str  # "api" or "cli"
     model: str
@@ -37,10 +60,28 @@ class ConfigError(Exception):
 
 class ConfigManager:
     """
-    設定管理クラス
+    アプリケーション設定の管理を行うメインクラス。
 
-    YAML設定ファイルの読み込み、環境変数解決、設定検証を行う。
-    セキュリティ要件に従いAPIキーの安全な取り扱いを実装。
+    YAML設定ファイルの安全な読み込み、環境変数の展開、設定値の検証、
+    およびプロバイダー固有設定の管理を統合的に行います。
+    セキュリティ要件に準拠したAPIキー管理と入力検証を実装。
+
+    Features:
+        - YAML設定ファイルの読み込みと解析
+        - ${VAR_NAME} 形式の環境変数展開
+        - プロバイダー設定の検証
+        - セキュリティを考慮した入力サニタイゼーション
+        - 複数のプロバイダータイプ(API/CLI)のサポート
+
+    Supported Providers:
+        API型: openai, anthropic, gemini
+        CLI型: gcloud, gemini-cli, claude-code, gemini-native
+
+    Example:
+        >>> manager = ConfigManager()
+        >>> config = manager.load_config("config.yml")
+        >>> if manager.validate_config(config):
+        ...     print("設定は有効です")
     """
 
     def __init__(self):
@@ -53,10 +94,11 @@ class ConfigManager:
         self.supported_providers = {
             'openai': {'type': 'api', 'required_fields': ['api_key', 'model_name']},
             'anthropic': {'type': 'api', 'required_fields': ['api_key', 'model_name']},
-            'gemini-api': {'type': 'api', 'required_fields': ['api_key', 'model_name']},
+            'gemini': {'type': 'api', 'required_fields': ['api_key', 'model_name']},
+            'gcloud': {'type': 'cli', 'required_fields': ['model_name']},
             'gemini-cli': {'type': 'cli', 'required_fields': ['model_name']},
             'claude-code': {'type': 'cli', 'required_fields': ['model_name']},
-            'gemini-native': {'type': 'cli', 'required_fields': []},
+            'gemini-native': {'type': 'cli', 'required_fields': ['model_name']},
         }
 
     def load_config(self, config_path: str) -> Dict[str, Any]:
@@ -78,7 +120,7 @@ class ConfigManager:
         if not config_file.exists():
             raise ConfigError(f"設定ファイルが見つかりません: {config_path}")
 
-        # ファイル権限をチェック（セキュリティ要件）
+        # ファイル権限をチェック(セキュリティ要件)
         permission_result = self.security_validator.check_file_permissions(str(config_file))
         if permission_result.level == "warning":
             logger.warning(f"設定ファイル権限警告: {permission_result.message}")
@@ -135,15 +177,15 @@ class ConfigManager:
             api_key = os.getenv(env_var_name)
 
         if not api_key:
-            raise ConfigError(f"APIキーが見つかりません（プロバイダー: {provider}）")
+            raise ConfigError(f"APIキーが見つかりません(プロバイダー: {provider})")
 
         # セキュリティバリデーターでAPIキーを検証
         validation_result = self.security_validator.validate_api_key(provider, api_key.strip())
         if not validation_result.is_valid:
-            raise ConfigError(f"APIキー検証エラー（{provider}）: {validation_result.message}")
+            raise ConfigError(f"APIキー検証エラー({provider}): {validation_result.message}")
 
         if validation_result.level == "warning":
-            logger.warning(f"APIキー警告（{provider}）: {validation_result.message}")
+            logger.warning(f"APIキー警告({provider}): {validation_result.message}")
             for rec in validation_result.recommendations:
                 logger.warning(f"推奨: {rec}")
 
@@ -164,7 +206,7 @@ class ConfigManager:
         """
         model_name = self.config.get('model_name')
         if not model_name:
-            raise ConfigError(f"モデル名が設定されていません（プロバイダー: {provider}）")
+            raise ConfigError(f"モデル名が設定されていません(プロバイダー: {provider})")
 
         return model_name
 
@@ -188,9 +230,10 @@ class ConfigManager:
             )
             logger.warning("プロンプトテンプレートが設定されていません。デフォルトを使用します。")
 
-        # $diffプレースホルダーが含まれているかチェック
-        if '$diff' not in template:
-            raise ConfigError("プロンプトテンプレートに$diffプレースホルダーが含まれていません")
+        # {diff} または $diff のいずれかのプレースホルダーが含まれているかチェック
+        if ('{diff}' not in template) and ('$diff' not in template):
+            logger.warning("プロンプトテンプレートに {diff} または $diff が無いため、末尾に自動追加します。")
+            template = f"{template.rstrip()}\n\n$diff\n"
 
         return template
 
@@ -213,7 +256,7 @@ class ConfigManager:
 
         provider_info = self.supported_providers[provider_name]
 
-        # APIキーの取得（API型プロバイダーのみ）
+        # APIキーの取得(API型プロバイダーのみ)
         api_key = None
         if provider_info['type'] == 'api':
             api_key = self.get_api_key(provider_name)
@@ -252,7 +295,7 @@ class ConfigManager:
             # プロバイダー固有の設定検証
             provider_info = self.supported_providers[provider]
             for field in provider_info['required_fields']:
-                # APIキーは別途チェック（セキュリティのため）
+                # APIキーは別途チェック(セキュリティのため)
                 if field == 'api_key':
                     if provider_info['type'] == 'api':
                         try:
@@ -261,7 +304,7 @@ class ConfigManager:
                             logger.error(f"APIキーの取得に失敗: {provider}")
                             return False
                 elif field not in self.config:
-                    logger.error(f"必須設定項目が不足（{provider}）: {field}")
+                    logger.error(f"必須設定項目が不足({provider}): {field}")
                     return False
 
             # 数値設定の範囲チェック
@@ -319,7 +362,7 @@ class ConfigManager:
 
     def _check_file_permissions(self, config_file: Path) -> None:
         """
-        設定ファイルの権限をチェック（セキュリティ要件）
+        設定ファイルの権限をチェック(セキュリティ要件)
 
         Args:
             config_file: 設定ファイルのパス
@@ -344,7 +387,7 @@ class ConfigManager:
                     )
 
         except Exception as e:
-            logger.debug(f"ファイル権限チェック中にエラー（処理続行）: {e}")
+            logger.debug(f"ファイル権限チェック中にエラー(処理続行): {e}")
 
     def get_supported_providers(self) -> Dict[str, Dict[str, Any]]:
         """
@@ -356,7 +399,7 @@ class ConfigManager:
         return self.supported_providers.copy()
 
     def __str__(self) -> str:
-        """設定の文字列表現（APIキーを除く）"""
+        """設定の文字列表現(APIキーを除く)"""
         safe_config = self.config.copy()
         if 'api_key' in safe_config:
             safe_config['api_key'] = '*' * 8  # APIキーをマスク

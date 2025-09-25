@@ -40,7 +40,7 @@ class ProviderFactory:
         if isinstance(provider_section, str):
             provider_name = provider_section.strip()
             # プロバイダー名から種類を推測
-            if provider_name.endswith('-cli') or provider_name in ['claude-code', 'gemini-native']:
+            if provider_name.endswith('-cli') or provider_name in ['claude-code', 'gemini-native', 'gcloud']:
                 provider_type = 'cli'
             else:
                 provider_type = 'api'

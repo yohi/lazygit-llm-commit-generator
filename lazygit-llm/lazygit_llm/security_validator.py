@@ -68,13 +68,22 @@ class SecurityValidator:
         r'[\x00-\x08\x0B\x0C\x0E-\x1F]',           # 制御文字(改行/タブ除外)
     ]
 
-    # 機密情報パターン
+    # 機密情報パターン（強化版）
     SENSITIVE_PATTERNS: ClassVar[List[str]] = [
         r'(?i)(password|passwd|pwd)\s*[:=]\s*[\'"]?([^\s\'"]{8,})',
         r'(?i)(secret|token|key)\s*[:=]\s*[\'"]?([^\s\'"]{16,})',
         r'(?i)(api[_-]?key)\s*[:=]\s*[\'"]?([^\s\'"]{20,})',
-        r'[A-Za-z0-9+/]{64,}={0,2}',  # Base64エンコード
-        r'[0-9a-fA-F]{32,}',          # Hexエンコード
+        # Base64パターン（4の倍数 + 適正パディング）
+        r'(?i)\b(?:[A-Za-z0-9+/]{4}){16,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{4})\b',
+        # Hexパターン（単語境界で誤検知抑制）
+        r'(?i)\b[0-9A-F]{32,}\b',
+        # Authorization/Bearerトークンパターン
+        r'(?i)\bauthorization\s*[:=]\s*[\'"]?(?:bearer\s+)?([^\s\'"]{20,})',
+        r'(?i)\bbearer\s+([^\s\'"]{20,})',
+        # 秘密鍵パターン（key=...形式）
+        r'(?i)(private[_-]?key|secret[_-]?key)\s*[:=]\s*[\'"]?([^\s\'"]{40,})',
+        # PEM秘密鍵ブロック
+        r'(?is)-----BEGIN [^-]*PRIVATE KEY-----.*?-----END [^-]*PRIVATE KEY-----',
     ]
 
     def __init__(self, enable_caching: bool = True):

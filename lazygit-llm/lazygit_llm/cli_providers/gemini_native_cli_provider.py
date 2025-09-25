@@ -155,18 +155,18 @@ class GeminiNativeCLIProvider(BaseProvider):
     def _sanitize_command_for_logging(self, cmd: list) -> str:
         """
         ログ出力用にコマンドラインを安全にサニタイズ
-        
+
         Args:
             cmd: コマンドライン引数のリスト
-            
+
         Returns:
             サニタイズされたコマンド文字列
         """
         if not cmd:
             return ""
-        
+
         sanitized = [cmd[0]]  # バイナリパスは保持
-        
+
         for i, arg in enumerate(cmd[1:], 1):
             if arg == '-p' and i + 1 < len(cmd):
                 # プロンプト引数をマスク
@@ -187,7 +187,7 @@ class GeminiNativeCLIProvider(BaseProvider):
                 sanitized.append('[LONG_ARGUMENT]')
             else:
                 sanitized.append(arg)
-                
+
         return ' '.join(sanitized)
 
     def _execute_gemini_command(self, prompt: str, timeout: Optional[int] = None) -> str:
@@ -215,10 +215,10 @@ class GeminiNativeCLIProvider(BaseProvider):
         if use_stdin:
             logger.debug(f"大きなプロンプト({prompt_size}bytes)をstdin経由で処理")
             # コマンド構築（stdinでプロンプトを渡す）
-            cmd = [self.gemini_path, '-p', '-']  # '-'でstdinを意味する
+            cmd = [self.gemini_path, '--prompt', '-']  # '-'でstdinを意味する
         else:
             # 小さなプロンプトはコマンド引数経由（互換性のため）
-            cmd = [self.gemini_path, '-p', prompt]
+            cmd = [self.gemini_path, '--prompt', prompt]
 
         try:
             # 機密情報を含む可能性のあるコマンドをサニタイズしてログ出力

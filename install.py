@@ -289,9 +289,10 @@ class Installer:
         providers = {
             '1': 'openai',
             '2': 'anthropic',
-            '3': 'gemini-api',
-            '4': 'gemini-cli',
-            '5': 'claude-code'
+            '3': 'gemini',
+            '4': 'gcloud',
+            '5': 'gemini-cli',
+            '6': 'claude-code'
         }
 
         print("\n   使用したいLLMプロバイダーを選択してください:")
@@ -303,7 +304,7 @@ class Installer:
 
         # APIキーの設定（API型プロバイダーの場合）
         api_key = ""
-        if selected_provider in ['openai', 'anthropic', 'gemini-api']:
+        if selected_provider in ['openai', 'anthropic', 'gemini']:
             api_key = input(f"\n   {selected_provider} のAPIキーを入力してください（空でスキップ）: ").strip()
 
         # 設定ファイルを更新
@@ -329,7 +330,8 @@ class Installer:
             model_defaults = {
                 'openai': 'gpt-4',
                 'anthropic': 'claude-3-5-sonnet-20241022',
-                'gemini-api': 'gemini-1.5-pro',
+                'gemini': 'gemini-1.5-pro',
+                'gcloud': 'gemini-1.5-pro',
                 'gemini-cli': 'gemini-1.5-pro',
                 'claude-code': 'claude-3-5-sonnet-20241022'
             }

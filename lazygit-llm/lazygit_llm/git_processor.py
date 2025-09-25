@@ -25,7 +25,30 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class DiffData:
-    """Git差分データの構造化表現"""
+    """
+    Git差分情報を構造化したデータクラス。
+
+    生の差分データから抽出した統計情報とメタデータを保持します。
+    LLMプロバイダーでの処理効率化とセキュリティ検証に使用されます。
+
+    Attributes:
+        raw_diff (str): 生のgit diff出力テキスト
+        file_count (int): 変更されたファイル数
+        additions (int): 追加された行数
+        deletions (int): 削除された行数
+        files_changed (List[str]): 変更されたファイル名のリスト
+        is_binary_change (bool): バイナリファイルの変更が含まれるかどうか
+        total_lines (int): 差分に含まれる総行数
+
+    Example:
+        >>> diff_data = DiffData(
+        ...     raw_diff="diff --git a/file.py...",
+        ...     file_count=2,
+        ...     additions=15,
+        ...     deletions=3,
+        ...     files_changed=["file1.py", "file2.py"]
+        ... )
+    """
     raw_diff: str
     file_count: int
     additions: int
@@ -42,12 +65,37 @@ class GitError(Exception):
 
 class GitDiffProcessor:
     """
-    Git差分処理クラス
+    Git差分の取得、解析、処理を行う統合クラス。
 
-    標準入力からgit diffの出力を読み取り、解析してLLM向けにフォーマットする。
-    LazyGitとの統合において、ステージされた変更の有無を確認する機能も提供。
-    パフォーマンス最適化として、キャッシュ機能と並行処理をサポート。
-    subprocess経由でのgitコマンド実行による差分取得もサポート。
+    LazyGitとの統合において中核的な役割を果たし、ステージされたGit差分の
+    安全で効率的な処理を提供します。セキュリティ検証、パフォーマンス最適化、
+    エラーハンドリングを統合的に実装。
+
+    Main Features:
+        - 標準入力からのgit diff読み取りと解析
+        - subprocess経由での `git diff --staged` 実行
+        - 差分データの構造化(DiffDataクラス)
+        - セキュリティ検証(機密情報検出、サイズ制限)
+        - パフォーマンス最適化(キャッシュ、並行処理)
+        - LazyGit統合対応(ステージ変更確認)
+
+    Security Features:
+        - 機密情報(APIキー等)の検出とマスキング
+        - 差分サイズ制限(デフォルト50KB)
+        - バイナリファイル変更の検出と除外
+        - 入力データのサニタイゼーション
+
+    Performance Features:
+        - LRUキャッシュによる重複処理回避
+        - 並行処理によるI/O最適化
+        - メモリ効率的な大きな差分の処理
+
+    Example:
+        >>> processor = GitDiffProcessor(max_diff_size=100000)
+        >>> diff_data = processor.get_staged_diff()
+        >>> if diff_data and processor.validate_diff_data(diff_data):
+        ...     print(f"ファイル数: {diff_data.file_count}")
+        ...     print(f"追加行数: {diff_data.additions}")
     """
 
     def __init__(self, max_diff_size: int = 50000, enable_parallel_processing: bool = True):
@@ -55,7 +103,7 @@ class GitDiffProcessor:
         Git差分プロセッサーを初期化
 
         Args:
-            max_diff_size: 処理する差分の最大サイズ（バイト）
+            max_diff_size: 処理する差分の最大サイズ(バイト)
             enable_parallel_processing: 並行処理を有効にするかどうか
         """
         self.max_diff_size = max_diff_size
@@ -66,11 +114,11 @@ class GitDiffProcessor:
         self._cache_maxsize = 128
         self.security_validator = SecurityValidator()
 
-        # 並行処理用のThreadPoolExecutor（オンデマンド作成）
+        # 並行処理用のThreadPoolExecutor(オンデマンド作成)
         self._executor = None
 
     def _get_executor(self) -> Optional[ThreadPoolExecutor]:
-        """ThreadPoolExecutorを取得（必要時に作成）"""
+        """ThreadPoolExecutorを取得(必要時に作成)"""
         if not self.enable_parallel_processing:
             return None
 
@@ -481,7 +529,7 @@ class GitDiffProcessor:
         if len(diff.encode('utf-8')) <= self.max_diff_size:
             return diff
 
-        # バイト単位で切り詰める（UTF-8/改行境界を優先）
+        # バイト単位で切り詰める(UTF-8/改行境界を優先)
         buf = diff.encode('utf-8')[:self.max_diff_size]
         truncated = buf.decode('utf-8', errors='ignore')
         nl = truncated.rfind('\n')
@@ -514,7 +562,7 @@ class GitDiffProcessor:
         自前LRUキャッシュを使用した差分フォーマット処理
 
         Args:
-            diff_hash: 差分のハッシュ値（キャッシュキーとして使用）
+            diff_hash: 差分のハッシュ値(キャッシュキーとして使用)
             diff: 差分内容
 
         Returns:
@@ -523,7 +571,7 @@ class GitDiffProcessor:
         with self._cache_lock:
             # キャッシュヒット確認
             if diff_hash in self._processing_cache:
-                # LRU更新（最後に移動）
+                # LRU更新(最後に移動)
                 value = self._processing_cache.pop(diff_hash)
                 self._processing_cache[diff_hash] = value
                 return value
@@ -543,7 +591,7 @@ class GitDiffProcessor:
 
     def _format_diff_internal(self, diff: str) -> str:
         """
-        内部的な差分フォーマット処理（キャッシュから呼び出される）
+        内部的な差分フォーマット処理(キャッシュから呼び出される)
 
         Args:
             diff: 差分内容

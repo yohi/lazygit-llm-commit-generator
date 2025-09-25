@@ -454,7 +454,7 @@ class GeminiCLIProvider(BaseProvider):
             モデル情報の辞書
         """
         return {
-            'provider': 'gemini-cli',
+            'provider': 'gcloud',
             'model': self.model,
             'supports_streaming': False,
             'max_output_tokens': self.max_output_tokens,

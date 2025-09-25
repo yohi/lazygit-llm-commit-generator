@@ -245,7 +245,7 @@ class SystemValidator:
             factory = ProviderFactory()
             available_providers = factory.get_available_providers()
 
-            expected_providers = ['openai', 'anthropic', 'gemini-api', 'gemini-cli', 'claude-code']
+            expected_providers = ['openai', 'anthropic', 'gemini', 'gcloud', 'gemini-cli', 'claude-code']
             missing_providers = [p for p in expected_providers if p not in available_providers]
 
             if missing_providers:

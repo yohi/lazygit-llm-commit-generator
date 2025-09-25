@@ -32,7 +32,7 @@ class TestConfigManager:
         """サポートされているプロバイダーの構造テスト"""
         providers = self.config_manager.supported_providers
 
-        expected_providers = ['openai', 'anthropic', 'gemini-api', 'gemini-cli', 'claude-code']
+        expected_providers = ['openai', 'anthropic', 'gemini', 'gcloud', 'gemini-cli', 'claude-code']
         for provider in expected_providers:
             assert provider in providers
             assert 'type' in providers[provider]
@@ -265,7 +265,7 @@ class TestConfigManager:
     def test_get_provider_config_cli_provider(self):
         """CLIプロバイダー設定取得テスト"""
         self.config_manager.config = {
-            'provider': 'gemini-cli',
+            'provider': 'gcloud',
             'model_name': 'gemini-1.5-pro',
             'timeout': 45,
             'max_tokens': 150
@@ -273,7 +273,7 @@ class TestConfigManager:
 
         provider_config = self.config_manager.get_provider_config()
 
-        assert provider_config.name == 'gemini-cli'
+        assert provider_config.name == 'gcloud'
         assert provider_config.type == 'cli'
         assert provider_config.model == 'gemini-1.5-pro'
         assert provider_config.api_key is None
@@ -352,7 +352,8 @@ class TestConfigManager:
         assert isinstance(providers, dict)
         assert 'openai' in providers
         assert 'anthropic' in providers
-        assert 'gemini-api' in providers
+        assert 'gemini' in providers
+        assert 'gcloud' in providers
         assert 'gemini-cli' in providers
         assert 'claude-code' in providers
 
@@ -378,7 +379,8 @@ class TestConfigManager:
     @pytest.mark.parametrize("provider,expected_type", [
         ('openai', 'api'),
         ('anthropic', 'api'),
-        ('gemini-api', 'api'),
+        ('gemini', 'api'),
+        ('gcloud', 'cli'),
         ('gemini-cli', 'cli'),
         ('claude-code', 'cli'),
     ])
